@@ -411,6 +411,8 @@ export const queryKeys = {
       ["issues", "runner-goal", issueId, agentId ?? "__effective__"] as const,
     workProducts: (issueId: string) =>
       ["issues", "work-products", issueId] as const,
+    planApproval: (issueId: string) =>
+      ["issues", "plan-approval", issueId] as const,
     workProductPullRequestRefresh: (issueId: string) =>
       ["issues", "work-product-pr-refresh", issueId] as const,
     fileResources: (

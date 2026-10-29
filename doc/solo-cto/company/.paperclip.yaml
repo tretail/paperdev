@@ -1,0 +1,31 @@
+schema: paperclip/v1
+agents:
+  tech-lead:
+    adapter:
+      type: claude_local
+      config:
+        engine: cli
+        toolProfile: read_only
+        requireSubscriptionAuth: true
+  planner:
+    adapter:
+      type: claude_local
+      config:
+        engine: cli
+        toolProfile: read_only
+        requireSubscriptionAuth: true
+  implementer:
+    adapter:
+      type: claude_local
+      config:
+        engine: cli
+        claudePermissionMode: auto
+        requireSubscriptionAuth: true
+        workspaceStrategy:
+          type: git_worktree
+routines:
+  daily-discovery:
+    triggers:
+      - kind: schedule
+        cronExpression: "0 8 * * *"
+        timezone: UTC

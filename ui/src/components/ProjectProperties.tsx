@@ -13,6 +13,7 @@ import { cn, formatDate } from "../lib/utils";
 import { environmentsApi } from "../api/environments";
 import { instanceSettingsApi } from "../api/instanceSettings";
 import { projectsApi } from "../api/projects";
+import { agentsApi } from "../api/agents";
 import { secretsApi } from "../api/secrets";
 import { useCompany } from "../context/CompanyContext";
 import { queryKeys } from "../lib/queryKeys";
@@ -46,6 +47,7 @@ export type ProjectConfigFieldKey =
   | "description"
   | "status"
   | "visibility"
+  | "plan_approval_policy"
   | "goals"
   | "env"
   | "workspace_storage_provider"
@@ -235,6 +237,12 @@ export function ProjectProperties({ project, repositories, onUpdate, onFieldUpda
     onUpdate?.(data);
   };
   const fieldState = (field: ProjectConfigFieldKey): ProjectFieldSaveState => getFieldSaveState?.(field) ?? "idle";
+  const planApprovalPolicy = project.planApprovalPolicy?.enabled ? project.planApprovalPolicy : null;
+  const { data: companyAgents } = useQuery({
+    queryKey: queryKeys.agents.list(project.companyId),
+    queryFn: () => agentsApi.list(project.companyId),
+    enabled: Boolean(planApprovalPolicy),
+  });
 
   const { data: experimentalSettings } = useQuery({
     queryKey: queryKeys.instance.experimentalSettings,
@@ -512,6 +520,44 @@ export function ProjectProperties({ project, repositories, onUpdate, onFieldUpda
         </PropertyRow>
         {repositories ?? <ProjectRepositories key={project.id} project={project} />}
         <ProjectGitAuthorization key={`git-${project.id}`} project={project} />
+        <PropertyRow label={<FieldLabel label="Plan approval" state={fieldState("plan_approval_policy")} />} alignStart>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm">
+              <ToggleSwitch
+                aria-label="Require plan approval"
+                checked={Boolean(planApprovalPolicy)}
+                onCheckedChange={(checked) => commitField("plan_approval_policy", {
+                  planApprovalPolicy: checked
+                    ? { enabled: true, implementerAgentId: project.planApprovalPolicy?.implementerAgentId ?? null }
+                    : null,
+                })}
+                disabled={!onUpdate && !onFieldUpdate}
+              />
+              <span>{planApprovalPolicy ? "Required before implementation" : "Not required"}</span>
+            </label>
+            {planApprovalPolicy ? (
+              <select
+                aria-label="Implementer agent"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                disabled={!onUpdate && !onFieldUpdate}
+                value={planApprovalPolicy.implementerAgentId ?? ""}
+                onChange={(event) => commitField("plan_approval_policy", {
+                  planApprovalPolicy: { enabled: true, implementerAgentId: event.target.value || null },
+                })}
+              >
+                <option value="">Keep the current assignee</option>
+                {(companyAgents ?? []).map((agent) => (
+                  <option key={agent.id} value={agent.id}>{agent.name}</option>
+                ))}
+              </select>
+            ) : null}
+            <p className="text-(length:--text-micro) text-muted-foreground">
+              {planApprovalPolicy
+                ? "Agents can only investigate and plan until you approve the task's current plan revision. Approval hands the task to the implementer."
+                : "Agents may implement tasks without an approved plan."}
+            </p>
+          </div>
+        </PropertyRow>
         <PropertyRow
           label={<FieldLabel label="Env" state={fieldState("env")} />}
           alignStart

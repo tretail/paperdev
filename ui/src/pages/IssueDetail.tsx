@@ -4240,6 +4240,7 @@ export function TaskDetailSurface({ conversation, tasksTab }: { tasksTab?: TaskS
   const invalidateIssueDetail = useCallback(() => {
     for (const ref of issueCacheRefs) {
       queryClient.invalidateQueries({ queryKey: queryKeys.issues.detail(ref) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.issues.planApproval(ref) });
       queryClient.invalidateQueries({
         queryKey: queryKeys.issues.activity(ref),
       });

@@ -26,6 +26,7 @@ import { authApi } from "../../api/auth";
 import { executionWorkspacesApi } from "../../api/execution-workspaces";
 import { instanceSettingsApi } from "../../api/instanceSettings";
 import { issuesApi } from "../../api/issues";
+import { PlanApprovalRow } from "./plan-approval-row";
 import { useIssuePlanDocument } from "@/hooks/useIssuePlanDocument";
 import { useIssueDocuments } from "@/hooks/useIssueDocuments";
 import { useStreamlinedUiEnabled } from "@/hooks/useStreamlinedUiEnabled";
@@ -2355,6 +2356,7 @@ export function IssueProperties({
             showLabel
           />
         </PropertyRow>
+        <PlanApprovalRow issueId={issue.id} enabled={Boolean(issue.projectId)} />
 
         {/* PAP-411: priority UI is hidden behind SHOW_TASK_PRIORITY_UI. Revive by flipping the flag. */}
         {SHOW_TASK_PRIORITY_UI && (

@@ -278,6 +278,28 @@ function issueListSearchParams(filters?: IssueListFilters) {
   return params;
 }
 
+/** Plan approval gate state for a task (see server plan-approval-gate). */
+export type IssuePlanApprovalState =
+  | { required: false }
+  | {
+    required: true;
+    approved: true;
+    planRevisionId: string;
+    planRevisionNumber: number;
+    interactionId: string;
+    approvedByUserId: string;
+    approvedAt: string | null;
+    implementerAgentId: string | null;
+  }
+  | {
+    required: true;
+    approved: false;
+    reason: "no_plan" | "not_approved" | "approval_stale";
+    planRevisionId: string | null;
+    planRevisionNumber: number | null;
+    implementerAgentId: string | null;
+  };
+
 export const issuesApi = {
   summaries: async (companyId: string, issueIds: readonly string[], options?: RequestOptions): Promise<IssueSummary[]> => {
     if (issueIds.length > ISSUE_SUMMARIES_MAX_IDS) throw new Error("Too many issue summary IDs");
@@ -780,6 +802,7 @@ export const issuesApi = {
   setVisibility: (id: string, visibility: IssueVisibility) =>
     api.patch<IssueUpdateResponse>(`/issues/${id}`, { visibility }),
   listApprovals: (id: string) => api.get<Approval[]>(`/issues/${id}/approvals`),
+  getPlanApproval: (id: string) => api.get<IssuePlanApprovalState>(`/issues/${id}/plan-approval`),
   linkApproval: (id: string, approvalId: string) =>
     api.post<Approval[]>(`/issues/${id}/approvals`, { approvalId }),
   unlinkApproval: (id: string, approvalId: string) =>
