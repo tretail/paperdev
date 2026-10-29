@@ -442,6 +442,7 @@ retain their titles and default to no generation request.
   - `standard`: normal autonomous execution. Agents may investigate, edit files, create artifacts, and complete the task.
   - `ask`: answer-only execution. Agents may use tools for investigation or temporary scratch work, but the deliverable is an issue-thread answer; they must not write implementation code or produce an implementation plan.
   - `planning`: plan-only execution. Agents create or revise the plan without implementation work. Accepting a fresh confirmation for the issue's current `plan` revision atomically changes this mode to `standard`, so the continuation may implement the approved plan on the source issue.
+  - Projects may opt into a plan approval gate (`projects.planApprovalPolicy`); for their issues the server enforces at dispatch and checkout that the current plan revision was approved by a human before any implementation run (see `doc/execution-semantics.md` §7).
 - Work mode is explicit persisted state. Titles, descriptions, and requested deliverables never select or change it. A `standard` task may deliver a requested plan, including a canonical `plan` document, and complete without entering `planning` mode. Existing explicit approval requirements still apply.
 - `billing_code` text null
 - `assignee_adapter_overrides` jsonb null
