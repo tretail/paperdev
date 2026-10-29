@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   agents,
+  applyPendingMigrations,
   companies,
   createDb,
   documents,
@@ -16,6 +17,7 @@ import {
   getEmbeddedPostgresTestSupport,
   startEmbeddedPostgresTestDatabase,
 } from "./helpers/embedded-postgres.js";
+import { resolveExternalTestDatabaseUrl } from "./helpers/external-test-database.js";
 import {
   decidePlanGateRun,
   evaluatePlanApproval,
@@ -24,7 +26,8 @@ import {
   readPlanApprovalImplementer,
 } from "../services/plan-approval-gate.js";
 
-const embeddedPostgresSupport = await getEmbeddedPostgresTestSupport();
+const externalUrl = resolveExternalTestDatabaseUrl("PAPERCLIP_PLAN_APPROVAL_GATE_TEST_DATABASE_URL");
+const embeddedPostgresSupport = externalUrl ? { supported: true, reason: undefined } : await getEmbeddedPostgresTestSupport();
 const describeEmbeddedPostgres = embeddedPostgresSupport.supported ? describe : describe.skip;
 
 if (!embeddedPostgresSupport.supported) {
@@ -38,9 +41,13 @@ describeEmbeddedPostgres("plan approval gate", () => {
   let db!: ReturnType<typeof createDb>;
 
   beforeAll(async () => {
-    tempDb = await startEmbeddedPostgresTestDatabase("paperclip-plan-approval-gate-");
-    db = createDb(tempDb.connectionString);
-  }, 20_000);
+    if (externalUrl) {
+      await applyPendingMigrations(externalUrl);
+    } else {
+      tempDb = await startEmbeddedPostgresTestDatabase("paperclip-plan-approval-gate-");
+    }
+    db = createDb(externalUrl ?? tempDb!.connectionString);
+  }, 120_000);
 
   afterEach(async () => {
     await db.delete(issueThreadInteractions);
