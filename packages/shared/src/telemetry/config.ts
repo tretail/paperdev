@@ -77,7 +77,9 @@ export function resolveTelemetryConfig(
   if (isCI()) {
     return { enabled: false, ...caps };
   }
-  if (fileConfig?.enabled === false) {
+  // This fork keeps first-party telemetry opt-in: it only runs when the
+  // config file explicitly sets `telemetry.enabled: true`.
+  if (fileConfig?.enabled !== true) {
     return { enabled: false, ...caps };
   }
 

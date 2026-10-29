@@ -13,6 +13,13 @@ Shared enum constants live in `packages/shared/src/constants.ts`. Use those
 constants when code needs a reusable domain, but treat the generated telemetry
 types as the final authority for emitted first-party telemetry shapes.
 
+## Enablement
+
+First-party telemetry is opt-in. `resolveTelemetryConfig()` returns
+`enabled: false` unless the Paperclip config file sets
+`telemetry.enabled: true`. `PAPERCLIP_TELEMETRY_DISABLED=1`, `DO_NOT_TRACK=1`,
+and CI environments still disable it even when the config opts in.
+
 ## Public Sources
 
 Use these files when reviewing or changing telemetry code:

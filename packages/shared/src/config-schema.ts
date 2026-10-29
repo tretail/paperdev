@@ -100,7 +100,7 @@ export const secretsConfigSchema = z.object({
 }).passthrough();
 
 export const telemetryConfigSchema = z.object({
-  enabled: z.boolean().default(true),
+  enabled: z.boolean().default(false),
 }).passthrough().prefault({});
 
 export const updatesConfigSchema = z.object({
