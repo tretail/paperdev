@@ -1,7 +1,11 @@
+import { execFile } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Per-company cloud CLI access for sandboxed Claude runs.
@@ -94,16 +98,41 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+function isMiseShim(candidate: string): boolean {
+  return candidate.split(path.sep).join("/").includes("/mise/shims/");
+}
+
+/**
+ * A mise shim re-enters `mise` (reading and writing its state) on every call,
+ * which the sandbox may refuse. Resolve shims to the installed binary while
+ * staging, outside the sandbox, using the global mise configuration.
+ */
+async function resolveMiseShim(name: string, searchPath: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync("mise", ["which", name], {
+      cwd: os.homedir(),
+      env: { ...process.env, PATH: searchPath },
+      timeout: 15_000,
+    });
+    const resolved = stdout.trim();
+    return resolved && !isMiseShim(resolved) ? resolved : null;
+  } catch {
+    return null;
+  }
+}
+
 async function resolveBinary(name: string, searchPath: string, exclude: string): Promise<string | null> {
   for (const dir of searchPath.split(path.delimiter)) {
     if (!dir || path.resolve(dir) === exclude) continue;
     const candidate = path.join(dir, name);
     try {
       await fs.access(candidate, fsConstants.X_OK);
-      return candidate;
     } catch {
-      // keep searching
+      continue;
     }
+    if (!isMiseShim(candidate)) return candidate;
+    const resolved = await resolveMiseShim(name, searchPath);
+    if (resolved) return resolved;
   }
   return null;
 }

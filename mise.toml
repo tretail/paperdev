@@ -1,0 +1,17 @@
+# Toolchain for this fork (see INSTALL.md). Cloud CLIs used by agents live in
+# the global mise config so they resolve the same in every company repo.
+[tools]
+node = "24"
+pnpm = "12.16.1"
+
+[tasks.dev]
+description = "Start Paperclip (API + UI on http://localhost:3100)"
+run = "pnpm dev"
+
+[tasks.gate-test]
+description = "Plan approval gate DB tests against a local paperclip_gate_test database"
+run = "cd server && PAPERCLIP_PLAN_APPROVAL_GATE_TEST_DATABASE_URL=postgres://paperclip@localhost:5432/paperclip_gate_test npx vitest run src/__tests__/plan-approval-gate.test.ts"
+
+[tasks.adapter-test]
+description = "claude-local adapter tests (permissions, sandbox, cloud CLIs)"
+run = "cd packages/adapters/claude-local && npx vitest run"

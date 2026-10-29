@@ -10,7 +10,8 @@ Design notes: [`doc/plans/2026-10-29-plan-approval-gate.md`](plans/2026-10-29-pl
 ## 1. Install and run
 
 ```sh
-pnpm install          # use the repo's pnpm (packageManager in package.json)
+mise trust && mise install   # Node 24 + pnpm 12.16.1 (mise.toml)
+pnpm install
 pnpm dev              # API + UI on http://localhost:3100
 ```
 
@@ -55,6 +56,7 @@ pnpm paperclipai company import ./doc/solo-cto/company --target new --new-compan
 | Agent | Claude permission profile | Can change code? |
 |---|---|---|
 | Tech Lead | `toolProfile: read_only` | No |
+| Product Lead | `toolProfile: read_only` (+ WebSearch/WebFetch) | No |
 | Planner | `toolProfile: read_only` | No |
 | Implementer | `claudePermissionMode: auto`, git worktree | Only after plan approval |
 
@@ -108,7 +110,7 @@ company directory, for example `~/Workspaces/patlynk`. It then runs Claude
 Code's built-in macOS sandbox (Seatbelt, no Docker), plus matching
 permission rules.
 
-| | Read-only agents (Tech Lead, Planner) | Implementer |
+| | Read-only agents (Tech Lead, Product Lead, Planner) | Implementer |
 |---|---|---|
 | Bash reads | Own company folder only; other companies are denied by the OS | Same |
 | Bash writes | None; the OS denies writes | Own workspace and the repo's `.git`; other companies are denied |
@@ -165,7 +167,7 @@ How it works:
   file, which is why the AWS config is named `config` inside
   `.paperclip-tools/aws/`.
 - The tool home sits at the company root, above the repos. The Implementer
-  can write to it, for token refresh. Planner and Tech Lead cannot read it.
+  can write to it, for token refresh. The read-only agents cannot read it.
 - The Implementer can always write to package caches (`~/.npm`,
   `~/Library/pnpm`, `~/Library/Caches`, `~/.cache`), so installs work.
 
@@ -202,6 +204,20 @@ Only board users can change a project's plan approval policy; agents get
 
 **A. Create the task.** Create it in the gated project with a title and
 description, for example "Add passwordless login using email magic links".
+
+**A2. Spec (product tasks only).** For a product feature, assign the task to
+the **Product Lead** first:
+
+- It writes a `spec` document: user problem, target users, user flow,
+  success metric, product acceptance criteria, and what's out of scope.
+- It asks you to approve the spec. Reject with feedback to get a revision.
+- Once approved, it hands the task to the Planner in planning mode. If it
+  can't reassign, it asks you to.
+
+Spec approval is a review step, not a backend gate. The plan gate below is
+what blocks code.
+
+Technical tasks go straight to the Planner.
 
 **B. Plan.** Assign the task to the **Planner**. The run is read-only:
 
@@ -273,18 +289,35 @@ Read the state with `GET /api/issues/:id/plan-approval`.
 
 ## 7. Scheduled task discovery
 
-The **Daily discovery** routine runs at 08:00 UTC and creates a task for the
-Tech Lead.
+Two daily routines create discovery tasks:
 
-- The Tech Lead proposes at most three tasks in a single `suggest_tasks` card,
-  each with rationale, evidence, acceptance criteria and an
-  impact/confidence/effort score.
-- If nothing is worth proposing, it says so instead.
+| Routine | Time (UTC) | Agent | Looks for |
+|---|---|---|---|
+| Daily technical discovery | 08:00 | Tech Lead | Bugs, tests, CI speed, DX, security, design and debt |
+| Daily product discovery | 09:00 | Product Lead | Friction in core flows (sign-up, onboarding, sharing), domain features, growth and retention loops, with web research |
+
+How they behave:
+
+- Each proposes at most three tasks in a single `suggest_tasks` card, with
+  evidence, acceptance criteria and a score.
+- Each says so instead if nothing is worth proposing.
+- They dedupe against open tasks and each other's suggestions.
 - Only the suggestions you accept become tasks.
-- The Tech Lead is read-only and never assigns the Implementer.
+- Neither implements anything or assigns the Implementer.
 
-To change or disable discovery, open **Routines → Daily discovery**. Edit the
-trigger's cron or timezone, switch the trigger off, or pause the routine.
+**Give the Product Lead context.** It works out the domain from the repo, then
+thinks as a product manager for that kind of user. For example, it looks at
+service-time pressure and staff turnover for a restaurant product, and at
+frictionless RSVP, sharing, polls and shared expenses for an events app.
+Its proposals get much better with real input:
+
+- copy `doc/solo-cto/product-context.template.md` to each product repo as
+  `docs/product-context.md`;
+- fill in vision, users, core loop, competitors, current focus, and pasted
+  customer feedback or metrics.
+
+To change or disable a routine, open **Routines**, then the routine. Edit the
+trigger's cron or timezone, switch the trigger off, or pause it.
 
 ## 8. Failed runs and recovery
 

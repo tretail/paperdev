@@ -4,7 +4,8 @@ This guide installs this fork on a new macOS machine and sets up one Paperclip
 company per real company. Each company gets three local Claude Code agents
 using your Claude subscription:
 
-- **Tech Lead** proposes work.
+- **Tech Lead** proposes technical work (CI, DX, security, design).
+- **Product Lead** proposes product work and writes specs.
 - **Planner** writes plans.
 - **Implementer** writes code only after you approve the plan.
 
@@ -30,16 +31,29 @@ git push -u mine cto-workflow
 |---|---|
 | Xcode command line tools | `xcode-select --install` |
 | Homebrew | https://brew.sh |
-| Node.js 24 (see `.nvmrc`) | `brew install nvm`, then `nvm install 24` |
-| pnpm 9.15.4 (the repo pins it) | `corepack enable && corepack prepare pnpm@9.15.4 --activate` |
+| [mise](https://mise.jdx.dev) | `brew install mise`, then add `eval "$(mise activate zsh)"` to `~/.zshrc` and open a new terminal |
+| Node.js 24 + pnpm 12.16.1 | from the repo's `mise.toml` (section 3) |
+| Python 3 + cloud CLIs | from your global mise config (below) |
 | PostgreSQL | [Postgres.app](https://postgresapp.com) (add its `bin` to PATH as it instructs) |
-| Python 3 | `brew install python` (needed for Claude subscription sign-in flows) |
-| Rust (optional) | `brew install rustup && rustup-init`. Only needed if the native Paperclip Runner gets built; these agents don't use it. |
+| Rust (optional) | `mise use -g rust`. Only needed if the native Paperclip Runner gets built; these agents don't use it. |
 | Claude Code CLI | Native installer (`curl -fsSL https://claude.ai/install.sh \| bash`, or see code.claude.com docs), then `claude --version` |
-| Cloud CLIs (as needed) | `brew install gh awscli azure-cli supabase/tap/supabase`; wrangler runs through `npx wrangler` |
 
-Use pnpm 9, not pnpm 10+. Newer pnpm ignores the repo's patch settings and
-refuses to run scripts (`ERR_PNPM_VERIFY_DEPS_BEFORE_RUN`).
+Put the cloud CLIs in your **global** mise config, so they resolve the same way
+in every company repo the agents work in. Create `~/.config/mise/config.toml`:
+
+```toml
+[tools]
+python = "3.12"      # Claude sign-in flows and azure-cli
+gh = "latest"
+aws = "latest"
+azure-cli = "latest" # pipx backend
+supabase = "latest"
+wrangler = "latest"  # npm backend
+```
+
+Then run `mise install`. Keep only the CLIs you need. Paperclip resolves mise
+shims to the real binaries when it builds the agents' per-run wrappers, so
+`mise activate` and shims both work.
 
 ## 2. Directory layout
 
@@ -66,6 +80,7 @@ git clone git@github.com:<you>/paperclip.git
 cd paperclip
 git checkout cto-workflow
 git remote add upstream https://github.com/paperclipai/paperclip.git   # to pull updates later
+mise trust && mise install   # Node 24 + pnpm 12.16.1 from mise.toml
 pnpm install
 ```
 
@@ -139,10 +154,11 @@ pnpm paperclipai company import ./doc/solo-cto/company --target new --new-compan
 
 This creates:
 
-- the **Tech Lead**, **Planner** and **Implementer** agents (`claude_local`,
+- the **Tech Lead**, **Product Lead**, **Planner** and **Implementer** agents (`claude_local`,
   sandboxed, subscription only);
 - the **App** project;
-- the **Daily discovery** routine (08:00 UTC).
+- the **Daily technical discovery** (08:00 UTC) and **Daily product discovery**
+  (09:00 UTC) routines.
 
 ### 7.2 Configure in the UI
 
@@ -161,7 +177,11 @@ This creates:
    `spec.adapterConfig.claudeSandbox.tools`, list the CLIs this company uses,
    e.g. `[gh, aws, wrangler]`. It defaults to `[gh]`. The same editor holds
    `isolationRoot` and `allowedDomains`.
-5. **Routines → Daily discovery**: change the time or timezone, or pause it.
+5. **Routines**: change the time or timezone of either discovery routine, or
+   pause it.
+6. **Product context**: copy `doc/solo-cto/product-context.template.md` to the
+   product repo as `docs/product-context.md` and fill it in. The Product Lead
+   reads it every run.
 
 ### 7.3 Per-company CLI credentials
 
@@ -210,7 +230,12 @@ never `main`.
 ## 8. How the workflow works
 
 1. **Create a task** in the company's App project.
-2. **Plan.** Assign the task to the **Planner**.
+   - **Product feature:** assign it to the **Product Lead** first. It writes a
+     `spec` (user problem, flow, success metric, acceptance criteria) and asks
+     you to approve it, then hands the task to the Planner.
+   - **Technical task:** go straight to step 2.
+2. **Plan.** Assign the task to the **Planner**. If there's an approved spec,
+   the plan follows it.
    - The Planner reads the repo (read-only) and writes the task's `plan`
      document.
    - It posts an approval card, and the task goes to `in_review`.
@@ -225,8 +250,9 @@ never `main`.
    - pushes a branch and opens a PR;
    - writes an `implementation-report`, then sets the task `in_review`.
 5. **Review** the PR and report, then mark the task `done` yourself.
-6. **Discovery.** Every day the Tech Lead proposes up to three tasks in one
-   card. Only the ones you accept become tasks.
+6. **Discovery.** Every day the Tech Lead (technical) and the Product Lead
+   (product, with web research) each propose up to three tasks in one card.
+   Only the ones you accept become tasks.
 
 **When an agent needs you** (expired SSO, MFA, a missing secret, a refused
 command):
@@ -239,7 +265,7 @@ command):
 
 - No implementation run starts without your approval of the current plan
   revision. This holds for retries, timers and recovery.
-- Planner and Tech Lead runs are read-only.
+- Tech Lead, Product Lead and Planner runs are read-only.
 - No agent can touch another company's folder or your personal credentials.
 
 ## 9. Troubleshooting
@@ -254,7 +280,8 @@ command):
 | `adapter_engine_unavailable` | Set the agent's engine to CLI (the imported agents already do). |
 | `aws`: "profile could not be found" | Run `pcaws <company> configure sso`; check `AWS_PROFILE` in the project env. |
 | A CLI can't reach a host | Add the domain to the agent's `claudeSandbox.allowedDomains` (Advanced tab). |
-| `pnpm` refuses to run | You're on pnpm 10+; `corepack prepare pnpm@9.15.4 --activate`. |
+| `pnpm` refuses to run (`ERR_PNPM_VERIFY_DEPS_BEFORE_RUN`) | `node_modules` came from another pnpm; run `pnpm install` with the repo's pnpm (`mise install`, then `pnpm --version` should print 12.16.1). |
+| "Agent skills awaiting approval: acpx, dotenv" | Informational pnpm 12 notice. Paperclip doesn't need them; leave them unapproved. |
 
 ## 10. Updating from upstream
 
@@ -263,6 +290,20 @@ git fetch upstream
 git merge upstream/master        # or rebase; resolve conflicts, then:
 pnpm install && pnpm dev         # migrations apply on start
 ```
+
+**pnpm conflicts.** This fork pins pnpm 12.16.1. It merged upstream's pnpm 11
+migration (PR paperclipai/paperclip#13894), so `pnpm-workspace.yaml` is the
+only place pnpm config lives (patches, overrides, `allowBuilds`). Upstream
+still pins its older pnpm until that PR lands. When merging:
+
+- **`package.json`:** keep `"packageManager": "pnpm@12.16.1"` and no `pnpm`
+  field.
+- **New `pnpm.*` entries from upstream:** if upstream adds a patch or override
+  to `package.json#pnpm`, move it into `pnpm-workspace.yaml` instead.
+- **`pnpm-lock.yaml`:** take upstream's version (`git checkout --theirs
+  pnpm-lock.yaml`), run `pnpm install`, and commit the regenerated lockfile.
+- **New references to upstream's older pnpm version** in workflows or docs: bump them to 12.16.1.
+- **Check:** `pnpm run check:pnpm-version` verifies all of the above.
 
 Fork-specific code is mostly in:
 

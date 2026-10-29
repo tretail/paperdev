@@ -98,4 +98,25 @@ describe("stageClaudeToolRuntime", () => {
     });
     expect(staged.missingBinaries).toEqual(["aws"]);
   });
+
+  it("resolves mise shims to the installed binary", async () => {
+    const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-mise-")));
+    dirs.push(root);
+    const shims = path.join(root, "mise", "shims");
+    const installed = path.join(root, "mise", "installs", "aws", "2.0.0", "bin");
+    const miseBin = path.join(root, "bin");
+    for (const dir of [shims, installed, miseBin]) await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(shims, "aws"), "#!/bin/sh\nexec mise x -- aws \"$@\"\n", { mode: 0o755 });
+    await fs.writeFile(path.join(installed, "aws"), "#!/bin/sh\necho real\n", { mode: 0o755 });
+    await fs.writeFile(path.join(miseBin, "mise"), `#!/bin/sh\n[ "$1" = which ] && echo '${path.join(installed, "aws")}'\n`, { mode: 0o755 });
+    const staged = await stageClaudeToolRuntime({
+      runId: runId(),
+      tools: ["aws"],
+      toolHome: "/ws/a/.paperclip-tools",
+      env: {},
+      basePath: [shims, miseBin, "/usr/bin", "/bin"].join(path.delimiter),
+    });
+    const wrapper = await fs.readFile(path.join(staged.directory, "bin", "aws"), "utf8");
+    expect(wrapper).toContain(`exec '${path.join(installed, "aws")}'`);
+  });
 });
