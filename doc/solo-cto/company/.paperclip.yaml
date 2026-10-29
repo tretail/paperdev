@@ -7,6 +7,9 @@ agents:
         engine: cli
         toolProfile: read_only
         requireSubscriptionAuth: true
+        claudeSandbox:
+          enabled: true
+          isolationRoot: ~/Workspaces
   planner:
     adapter:
       type: claude_local
@@ -14,6 +17,9 @@ agents:
         engine: cli
         toolProfile: read_only
         requireSubscriptionAuth: true
+        claudeSandbox:
+          enabled: true
+          isolationRoot: ~/Workspaces
   implementer:
     adapter:
       type: claude_local
@@ -21,6 +27,16 @@ agents:
         engine: cli
         claudePermissionMode: auto
         requireSubscriptionAuth: true
+        claudeSandbox:
+          enabled: true
+          isolationRoot: ~/Workspaces
+          allowedDomains:
+            - github.com
+            - api.github.com
+            - uploads.github.com
+            - codeload.github.com
+            - objects.githubusercontent.com
+            - registry.npmjs.org
         workspaceStrategy:
           type: git_worktree
 routines:

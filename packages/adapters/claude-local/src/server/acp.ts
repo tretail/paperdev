@@ -105,12 +105,12 @@ export async function resolveClaudeExecutionEngineForRun(
   if (selection.engine === "cli") return selection;
   // Claude Code permission modes and read-only profiles are CLI flags. ACP
   // cannot express them, so use the CLI rather than weakening the profile.
-  if (claudePermissionProfileRequiresCli(resolveClaudePermissionProfile(input.config, input.context))) {
+  if (claudePermissionProfileRequiresCli(resolveClaudePermissionProfile(input.config, input.context), input.config)) {
     if (selection.explicit) {
       return {
         ...selection,
         unavailableReason:
-          "claudePermissionMode, toolProfile=read_only, and plan-gated runs require the Claude CLI engine; ACP cannot enforce them. Set engine=cli or leave engine unset.",
+          "claudePermissionMode, toolProfile=read_only, claudeSandbox, and plan-gated runs require the Claude CLI engine; ACP cannot enforce them. Set engine=cli or leave engine unset.",
       };
     }
     return { engine: "cli", explicit: false };

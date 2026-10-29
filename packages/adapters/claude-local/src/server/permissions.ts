@@ -130,8 +130,14 @@ export function resolveClaudePermissionProfile(
 }
 
 /** True when the run must use the CLI engine because ACP cannot express the profile. */
-export function claudePermissionProfileRequiresCli(profile: ClaudePermissionProfile): boolean {
-  return profile.kind !== "legacy";
+export function claudePermissionProfileRequiresCli(
+  profile: ClaudePermissionProfile,
+  config: Record<string, unknown> = {},
+): boolean {
+  const sandbox = config.claudeSandbox;
+  const sandboxEnabled = typeof sandbox === "object" && sandbox !== null &&
+    (sandbox as Record<string, unknown>).enabled === true;
+  return profile.kind !== "legacy" || sandboxEnabled;
 }
 
 /** Whether Claude runs with full permission bypass under this profile. */
@@ -159,25 +165,44 @@ export function findClaudePermissionProfileConflict(
   return extraArgs.find((arg) => flags.some((flag) => flagMatches(arg, flag))) ?? null;
 }
 
+/** Sandbox inputs from `resolveClaudeSandboxProfile` (see sandbox-profile.ts). */
+export interface ClaudeSandboxArgs {
+  settings: Record<string, unknown>;
+  readOnlyAllowedTools: string[];
+  disallowedTools: string[];
+}
+
+/** Read-only file tools; with a sandbox they are replaced by path-scoped rules. */
+const UNSCOPED_READ_TOOLS = new Set(["Read", "Grep", "Glob"]);
+
 export function buildClaudePermissionProfileArgs(
   profile: ClaudePermissionProfile,
   input: Omit<ClaudePermissionInput, "dangerouslySkipPermissions">,
+  sandbox: ClaudeSandboxArgs | null = null,
 ): string[] {
+  const sandboxArgs = sandbox ? ["--settings", JSON.stringify(sandbox.settings)] : [];
   if (profile.kind === "legacy") {
-    return buildClaudeExecutionPermissionArgs({ ...input, dangerouslySkipPermissions: profile.dangerouslySkipPermissions });
+    const args = buildClaudeExecutionPermissionArgs({ ...input, dangerouslySkipPermissions: profile.dangerouslySkipPermissions });
+    if (sandbox && sandbox.disallowedTools.length > 0) args.push("--disallowedTools", ...sandbox.disallowedTools);
+    return [...args, ...sandboxArgs];
   }
   if (profile.kind === "mode") {
     const args = ["--permission-mode", profile.mode];
+    const disallowed = [...new Set([...profile.disallowedTools, ...(sandbox?.disallowedTools ?? [])])];
     if (profile.allowedTools.length > 0) args.push("--allowedTools", ...profile.allowedTools);
-    if (profile.disallowedTools.length > 0) args.push("--disallowedTools", ...profile.disallowedTools);
-    return args;
+    if (disallowed.length > 0) args.push("--disallowedTools", ...disallowed);
+    return [...args, ...sandboxArgs];
   }
-  const allowed = [...new Set([...CLAUDE_READ_ONLY_ALLOWED_TOOLS, ...profile.allowedTools])];
+  const baseAllowed = sandbox
+    ? [...sandbox.readOnlyAllowedTools, ...CLAUDE_READ_ONLY_ALLOWED_TOOLS.filter((tool) => !UNSCOPED_READ_TOOLS.has(tool))]
+    : [...CLAUDE_READ_ONLY_ALLOWED_TOOLS];
+  const allowed = [...new Set([...baseAllowed, ...profile.allowedTools])];
   const disallowed = [...new Set([...CLAUDE_READ_ONLY_DISALLOWED_TOOLS, ...profile.disallowedTools])];
   return [
     "--permission-mode", "dontAsk",
     "--tools", CLAUDE_READ_ONLY_TOOLS.join(","),
     "--allowedTools", ...allowed,
     "--disallowedTools", ...disallowed,
+    ...sandboxArgs,
   ];
 }

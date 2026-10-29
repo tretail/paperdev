@@ -55,6 +55,28 @@ Paperclip already had planning work mode, versioned `plan` documents, and
   `auto` mode. The git policy is therefore instruction-level, plus branch
   protection.
 
+## Addendum: per-company sandbox (`claudeSandbox`)
+
+`packages/adapters/claude-local/src/server/sandbox-profile.ts` derives the
+company directory (the child of `isolationRoot` that contains the workspace).
+It passes Claude Code sandbox settings via `--settings`, plus path-scoped
+file-tool rules.
+
+Probes (macOS, Claude Code 2.1.312) through the real generated args:
+
+- a narrower `allowRead` overrides a parent `denyRead`;
+- `denyWrite` beats a narrower `allowWrite`;
+- path-scoped `Read(...)` allows in `dontAsk` also gate Grep and Glob;
+- `Read`/`Edit`/`Write` deny rules hold in `auto` mode;
+- worktree commits work when the git common dir is writable;
+- sandboxed `curl` reaches localhost only with `network.allowLocalBinding: true`.
+
+Read-only args: other-company reads were denied by both the tool rule and the
+OS, and `touch` was denied.
+
+Implementer args: worktree write and commit worked. Other-company Read and
+Write were denied by the tool rules, and Bash `cat` there by the OS.
+
 ## Not done
 
 - No event trigger for "task completed" discovery.

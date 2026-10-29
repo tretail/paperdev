@@ -106,6 +106,12 @@ import {
   resolveClaudePermissionProfile,
 } from "./permissions.js";
 import { describeReadOnlyWorkspaceChange, snapshotReadOnlyWorkspace } from "./read-only-workspace-guard.js";
+import {
+  ClaudeSandboxProfileError,
+  readClaudeSandboxConfig,
+  resolveClaudeSandboxProfile,
+  type ClaudeSandboxProfile,
+} from "./sandbox-profile.js";
 import { resolveClaudeModel, SANDBOX_INSTALL_COMMAND } from "../index.js";
 import {
   createClaudeAcpExecutor,
@@ -881,6 +887,8 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     model && (!isBedrockAuth(modelEnv) || isBedrockModelId(model)),
   );
 
+  // Resolved inside the run's try block so failures settle like other preflight errors.
+  let sandboxProfile: ClaudeSandboxProfile | null = null;
   const buildClaudeArgs = (
     resumeSessionId: string | null,
     attemptInstructionsFilePath: string | undefined,
@@ -895,7 +903,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     args.push(...buildClaudePermissionProfileArgs(permissionProfile, {
       targetIsRemote: executionTargetIsRemote,
       localProcessUid: process.getuid?.() ?? null,
-    }));
+    }, sandboxProfile));
     if (chrome) args.push("--chrome");
     // For Bedrock: only pass --model when the ID is a Bedrock-native identifier
     // (e.g. "us.anthropic.*" or ARN). Anthropic-style IDs like "claude-opus-4-6" are invalid
@@ -1426,6 +1434,51 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
           `[paperclip] Claude CLI in the environment does not advertise --effort; omitting configured effort "${effort}". Upgrade the environment CLI/image to restore reasoning-effort control.\n`,
         );
       }
+    }
+
+    let sandboxConfig: ReturnType<typeof readClaudeSandboxConfig> = null;
+    try {
+      sandboxConfig = readClaudeSandboxConfig(config);
+      if (sandboxConfig && extraArgs.some((arg) => arg === "--settings" || arg.startsWith("--settings="))) {
+        throw new ClaudeSandboxProfileError(
+          "claude_permission_profile_conflict",
+          "extraArgs contains --settings, which would override the claudeSandbox settings. Remove it from the agent's extraArgs.",
+        );
+      }
+      if (sandboxConfig && executionTargetIsRemote) {
+        throw new ClaudeSandboxProfileError(
+          "claude_sandbox_remote_unsupported",
+          "claudeSandbox applies to local runs only; remote execution targets have their own isolation.",
+        );
+      }
+      sandboxProfile = sandboxConfig
+        ? await resolveClaudeSandboxProfile({
+            sandbox: sandboxConfig,
+            cwd: effectiveExecutionCwd,
+            readOnly: permissionProfile.kind === "read_only",
+            promptBundleDir: effectivePromptBundleAddDir,
+            instructionsDir: instructionsFilePath ? path.dirname(instructionsFilePath) : null,
+          })
+        : null;
+    } catch (error) {
+      if (!(error instanceof ClaudeSandboxProfileError)) throw error;
+      await onLog("stderr", `[paperclip] ${error.message}\n`);
+      return {
+        exitCode: 1,
+        signal: null,
+        timedOut: false,
+        errorCode: error.code,
+        errorMessage: error.message,
+        billingType,
+        resultJson: { executionRecovery: { kind: "bootstrap", providerWorkStarted: false } },
+      };
+    }
+    if (sandboxProfile) {
+      await onLog(
+        "stdout",
+        `[paperclip] Claude OS sandbox on: company directory ${sandboxProfile.companyRoot}; ` +
+          `${sandboxProfile.disallowedTools.length} file-tool deny rules.\n`,
+      );
     }
 
     const readOnlySnapshot = permissionProfile.kind === "read_only" && !executionTargetIsRemote

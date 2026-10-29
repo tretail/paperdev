@@ -32,6 +32,7 @@ import {
 } from "./cli-capabilities.js";
 import { prepareCompatibleClaudeCommand } from "./sandbox-cli-version.js";
 import { isBedrockModelId } from "./models.js";
+import { ClaudeSandboxProfileError, readClaudeSandboxConfig, resolveClaudeSandboxProfile } from "./sandbox-profile.js";
 import {
   buildClaudePermissionProfileArgs,
   claudePermissionProfileBypasses,
@@ -382,10 +383,32 @@ export async function testEnvironment(
       if (config.managedAiConnection || claudePermissionProfileRestrictsSettingSources(permissionProfile)) {
         args.push("--setting-sources", "user");
       }
+      // The probe runs under the agent's sandbox too, so a sandbox that
+      // cannot start, or a cwd outside the isolation root, fails the test.
+      let sandboxProfile: Awaited<ReturnType<typeof resolveClaudeSandboxProfile>> | null = null;
+      try {
+        const sandboxConfig = readClaudeSandboxConfig(config);
+        if (sandboxConfig && !targetIsRemote) {
+          sandboxProfile = await resolveClaudeSandboxProfile({
+            sandbox: sandboxConfig,
+            cwd,
+            readOnly: permissionProfile.kind === "read_only",
+            promptBundleDir: cwd,
+          });
+          checks.push({
+            code: "claude_sandbox_configured",
+            level: "info",
+            message: `Claude OS sandbox is on for company directory ${sandboxProfile.companyRoot}.`,
+          });
+        }
+      } catch (error) {
+        if (!(error instanceof ClaudeSandboxProfileError)) throw error;
+        checks.push({ code: error.code, level: "error", message: error.message });
+      }
       args.push(...buildClaudePermissionProfileArgs(permissionProfile, {
         targetIsRemote,
         localProcessUid: process.getuid?.() ?? null,
-      }));
+      }, sandboxProfile));
       if (chrome) args.push("--chrome");
       // For Bedrock: only pass --model when the ID is a Bedrock-native identifier.
       if (model && (!hasBedrock || isBedrockModelId(model))) {

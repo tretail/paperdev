@@ -85,9 +85,54 @@ GitHub for a hard guarantee (see Limitations).
 - `toolProfile: read_only`
 - `allowedTools` / `disallowedTools`
 - `requireSubscriptionAuth`
+- `claudeSandbox` (see below)
 
 Agents that set none of them keep the legacy behaviour, which is
 `dangerouslySkipPermissions`, default true.
+
+### Directory isolation between companies
+
+Keep each company's repositories under one folder per company, all under a
+common parent:
+
+```text
+~/Workspaces/
+  patlynk/    ← company A's repos
+  flow/       ← company B's repos
+  together/   ← company C's repos
+```
+
+Each agent sets `claudeSandbox: { enabled: true, isolationRoot: ~/Workspaces }`.
+Paperclip uses the folder that contains the run's workspace as that run's
+company directory, for example `~/Workspaces/patlynk`. It then runs Claude
+Code's built-in macOS sandbox (Seatbelt, no Docker), plus matching
+permission rules.
+
+| | Read-only agents (Tech Lead, Planner) | Implementer |
+|---|---|---|
+| Bash reads | Own company folder only; other companies are denied by the OS | Same |
+| Bash writes | None; the OS denies writes | Own workspace and the repo's `.git`; other companies are denied |
+| Claude Read/Grep/Glob | Own company folder plus Paperclip's prompt bundle and skills | Everything except other companies and secrets |
+| Claude Edit/Write | Not loaded | Denied for other companies and secrets |
+| Secrets | `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.paperclip`, `~/.config/gh` unreadable | Same, except `~/.config/gh`, which it needs to open PRs |
+| Network | Paperclip API on localhost only | Localhost plus `allowedDomains` (GitHub, npm registry by default) |
+
+A new company folder is picked up automatically on the next run. Use
+`extraDenyRead` to hide more paths.
+
+The run fails instead of running unprotected in three cases:
+
+- the sandbox cannot start;
+- the workspace is not inside `isolationRoot`
+  (`claude_sandbox_workspace_outside_root`);
+- `extraArgs` contains `--settings`.
+
+**Run test** on the agent page runs the hello probe inside the same sandbox.
+
+**Pushing from the Implementer.** `~/.ssh` is unreadable in the sandbox, and
+SSH does not go through the sandbox's network proxy. Use HTTPS remotes
+authenticated by the GitHub CLI: run `gh auth login` and `gh auth setup-git`
+once, then set `git remote set-url origin https://github.com/<org>/<repo>.git`.
 
 ## 4. Enable the gate on a project
 
@@ -198,10 +243,15 @@ trigger's cron or timezone, switch the trigger off, or pause the routine.
 
 ## 9. Known limitations
 
-- **No OS sandbox on macOS.** Read-only enforcement relies on Claude Code
-  permissions plus the git before/after check. `curl` could in principle write
-  files; the check catches tracked and untracked changes, but not writes
-  outside the repository.
+- **The OS sandbox covers Bash only.** Claude's own Read/Edit/Write tools, MCP
+  servers and hooks run outside it and are limited by permission rules. Without
+  `claudeSandbox`, read-only enforcement relies on those rules plus the git
+  before/after check.
+- **Within its own company, the Implementer's Bash can write anywhere in the
+  repo**, including the main checkout, not only its worktree. With the sandbox,
+  a deny-write rule beats a narrower allow, so the worktree alone can't be
+  carved out. Other companies and secrets stay protected.
+- **Allowed domains can carry data out.** Keep `allowedDomains` short.
 - **The Implementer's git policy comes from its instructions.** Claude Code
   deny rules did not block `git push` in `auto` mode in our probe. Use GitHub
   branch protection on `main`.
