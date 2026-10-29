@@ -21,3 +21,163 @@ export function claudeSandboxPermissionEnv(input: {
 }): Record<string, string> {
   return input.dangerouslySkipPermissions && input.targetIsSandbox ? { IS_SANDBOX: "1" } : {};
 }
+
+/** Claude Code CLI `--permission-mode` values that Paperclip passes through. */
+export const CLAUDE_CLI_PERMISSION_MODES = [
+  "auto",
+  "dontAsk",
+  "plan",
+  "acceptEdits",
+  "bypassPermissions",
+] as const;
+export type ClaudeCliPermissionMode = (typeof CLAUDE_CLI_PERMISSION_MODES)[number];
+
+/** Built-in tools available to read-only runs; Edit/Write/NotebookEdit are not loaded at all. */
+export const CLAUDE_READ_ONLY_TOOLS = ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"] as const;
+
+/**
+ * Pre-approved tools for read-only runs. `dontAsk` denies everything else, so
+ * Bash is limited to the Paperclip API (curl) and read-only git inspection.
+ */
+export const CLAUDE_READ_ONLY_ALLOWED_TOOLS = [
+  "Read",
+  "Grep",
+  "Glob",
+  "WebSearch",
+  "WebFetch",
+  "Bash(curl:*)",
+  "Bash(git log:*)",
+  "Bash(git show:*)",
+  "Bash(git diff:*)",
+  "Bash(git status:*)",
+] as const;
+
+export const CLAUDE_READ_ONLY_DISALLOWED_TOOLS = ["Edit", "Write", "MultiEdit", "NotebookEdit"] as const;
+
+const PERMISSION_FLAGS = [
+  "--dangerously-skip-permissions",
+  "--allow-dangerously-skip-permissions",
+  "--permission-mode",
+] as const;
+const READ_ONLY_CONFLICTING_FLAGS = [
+  ...PERMISSION_FLAGS,
+  "--tools",
+  "--allowedTools",
+  "--allowed-tools",
+  "--setting-sources",
+  "--settings",
+] as const;
+
+export type ClaudePermissionProfile =
+  | { kind: "legacy"; dangerouslySkipPermissions: boolean }
+  | {
+    kind: "mode";
+    mode: ClaudeCliPermissionMode;
+    allowedTools: string[];
+    disallowedTools: string[];
+  }
+  | {
+    kind: "read_only";
+    reason: "agent_tool_profile" | "plan_approval_gate";
+    allowedTools: string[];
+    disallowedTools: string[];
+  };
+
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    .map((entry) => entry.trim());
+}
+
+function readPlanGateMode(context: Record<string, unknown> | undefined): string | null {
+  const gate = context?.paperclipPlanGate;
+  if (typeof gate !== "object" || gate === null) return null;
+  const mode = (gate as Record<string, unknown>).mode;
+  return typeof mode === "string" ? mode : null;
+}
+
+/**
+ * Resolve the Claude permission contract for one run.
+ *
+ * - A plan-gated planning run, or an agent with `toolProfile: "read_only"`, is
+ *   always read-only, whatever bypass or mode the agent otherwise requests.
+ * - `claudePermissionMode` selects a Claude Code `--permission-mode`.
+ * - Otherwise the legacy `dangerouslySkipPermissions` behavior applies.
+ */
+export function resolveClaudePermissionProfile(
+  config: Record<string, unknown>,
+  context?: Record<string, unknown>,
+): ClaudePermissionProfile {
+  const allowedTools = stringList(config.allowedTools);
+  const disallowedTools = stringList(config.disallowedTools);
+  if (readPlanGateMode(context) === "plan") {
+    // The gate is server policy: agent config may add denials but never widen it.
+    return { kind: "read_only", reason: "plan_approval_gate", allowedTools: [], disallowedTools };
+  }
+  if (config.toolProfile === "read_only") {
+    return { kind: "read_only", reason: "agent_tool_profile", allowedTools, disallowedTools };
+  }
+  const mode = typeof config.claudePermissionMode === "string" ? config.claudePermissionMode.trim() : "";
+  if ((CLAUDE_CLI_PERMISSION_MODES as readonly string[]).includes(mode)) {
+    return { kind: "mode", mode: mode as ClaudeCliPermissionMode, allowedTools, disallowedTools };
+  }
+  return {
+    kind: "legacy",
+    dangerouslySkipPermissions: typeof config.dangerouslySkipPermissions === "boolean"
+      ? config.dangerouslySkipPermissions
+      : true,
+  };
+}
+
+/** True when the run must use the CLI engine because ACP cannot express the profile. */
+export function claudePermissionProfileRequiresCli(profile: ClaudePermissionProfile): boolean {
+  return profile.kind !== "legacy";
+}
+
+/** Whether Claude runs with full permission bypass under this profile. */
+export function claudePermissionProfileBypasses(profile: ClaudePermissionProfile): boolean {
+  if (profile.kind === "legacy") return profile.dangerouslySkipPermissions;
+  return profile.kind === "mode" && profile.mode === "bypassPermissions";
+}
+
+/** Whether Claude must ignore project/local settings files from the workspace. */
+export function claudePermissionProfileRestrictsSettingSources(profile: ClaudePermissionProfile): boolean {
+  return profile.kind === "read_only";
+}
+
+function flagMatches(arg: string, flag: string): boolean {
+  return arg === flag || arg.startsWith(`${flag}=`);
+}
+
+/** Returns the first extra arg that would override the resolved permission profile. */
+export function findClaudePermissionProfileConflict(
+  profile: ClaudePermissionProfile,
+  extraArgs: readonly string[],
+): string | null {
+  if (profile.kind === "legacy") return null;
+  const flags: readonly string[] = profile.kind === "read_only" ? READ_ONLY_CONFLICTING_FLAGS : PERMISSION_FLAGS;
+  return extraArgs.find((arg) => flags.some((flag) => flagMatches(arg, flag))) ?? null;
+}
+
+export function buildClaudePermissionProfileArgs(
+  profile: ClaudePermissionProfile,
+  input: Omit<ClaudePermissionInput, "dangerouslySkipPermissions">,
+): string[] {
+  if (profile.kind === "legacy") {
+    return buildClaudeExecutionPermissionArgs({ ...input, dangerouslySkipPermissions: profile.dangerouslySkipPermissions });
+  }
+  if (profile.kind === "mode") {
+    const args = ["--permission-mode", profile.mode];
+    if (profile.allowedTools.length > 0) args.push("--allowedTools", ...profile.allowedTools);
+    if (profile.disallowedTools.length > 0) args.push("--disallowedTools", ...profile.disallowedTools);
+    return args;
+  }
+  const allowed = [...new Set([...CLAUDE_READ_ONLY_ALLOWED_TOOLS, ...profile.allowedTools])];
+  const disallowed = [...new Set([...CLAUDE_READ_ONLY_DISALLOWED_TOOLS, ...profile.disallowedTools])];
+  return [
+    "--permission-mode", "dontAsk",
+    "--tools", CLAUDE_READ_ONLY_TOOLS.join(","),
+    "--allowedTools", ...allowed,
+    "--disallowedTools", ...disallowed,
+  ];
+}

@@ -54,7 +54,12 @@ import {
 import { createWorkspaceRestoreTeardown } from "@paperclipai/adapter-utils/workspace-restore-teardown";
 import { buildLocalAdapterTestProbeEnv } from "./probe-env.js";
 import { detectClaudeLoginRequired, extractClaudeRetryNotBefore, isClaudeProviderQuotaError, parseClaudeStreamJson } from "./parse.js";
-import { buildClaudeProbePermissionArgs, claudeSandboxPermissionEnv } from "./permissions.js";
+import {
+  buildClaudeProbePermissionArgs,
+  claudePermissionProfileRequiresCli,
+  claudeSandboxPermissionEnv,
+  resolveClaudePermissionProfile,
+} from "./permissions.js";
 import { ADAPTER_AUTH_MISSING_CHECK_CODE } from "./auth-check.js";
 import { resolveClaudeModel, SANDBOX_INSTALL_COMMAND } from "../index.js";
 
@@ -72,7 +77,7 @@ export interface ClaudeEngineSelection {
 
 type ClaudeEngineResolutionInput =
   Pick<AdapterExecutionContext, "config"> &
-  Partial<Pick<AdapterExecutionContext, "executionTarget" | "executionTransport">>;
+  Partial<Pick<AdapterExecutionContext, "context" | "executionTarget" | "executionTransport">>;
 
 type ClaudeAcpExecutorOptions = Omit<
   AcpxEngineExecutorOptions,
@@ -98,6 +103,18 @@ export async function resolveClaudeExecutionEngineForRun(
   const selection = normalizeEngine(input.config.engine);
   // Engine availability must never change the agent's execution or permission contract.
   if (selection.engine === "cli") return selection;
+  // Claude Code permission modes and read-only profiles are CLI flags. ACP
+  // cannot express them, so use the CLI rather than weakening the profile.
+  if (claudePermissionProfileRequiresCli(resolveClaudePermissionProfile(input.config, input.context))) {
+    if (selection.explicit) {
+      return {
+        ...selection,
+        unavailableReason:
+          "claudePermissionMode, toolProfile=read_only, and plan-gated runs require the Claude CLI engine; ACP cannot enforce them. Set engine=cli or leave engine unset.",
+      };
+    }
+    return { engine: "cli", explicit: false };
+  }
   const unavailable = (reason: string): ClaudeEngineSelection => ({
     ...selection,
     unavailableReason: `${reason} Repair the ACP setup, or explicitly set engine=cli to use the CLI engine.`,

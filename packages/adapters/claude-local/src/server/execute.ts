@@ -97,7 +97,15 @@ import { prepareCompatibleClaudeCommand } from "./sandbox-cli-version.js";
 import { resolveClaudeDesiredSkillNames } from "./skills.js";
 import { isBedrockModelId } from "./models.js";
 import { prepareClaudePromptBundle } from "./prompt-cache.js";
-import { buildClaudeExecutionPermissionArgs, claudeSandboxPermissionEnv } from "./permissions.js";
+import {
+  buildClaudePermissionProfileArgs,
+  claudePermissionProfileBypasses,
+  claudePermissionProfileRestrictsSettingSources,
+  claudeSandboxPermissionEnv,
+  findClaudePermissionProfileConflict,
+  resolveClaudePermissionProfile,
+} from "./permissions.js";
+import { describeReadOnlyWorkspaceChange, snapshotReadOnlyWorkspace } from "./read-only-workspace-guard.js";
 import { resolveClaudeModel, SANDBOX_INSTALL_COMMAND } from "../index.js";
 import {
   createClaudeAcpExecutor,
@@ -442,7 +450,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const effort = asString(config.effort, "");
   const chrome = asBoolean(config.chrome, false);
   const maxTurns = asNumber(config.maxTurnsPerRun, 0);
-  const dangerouslySkipPermissions = asBoolean(config.dangerouslySkipPermissions, true);
+  const permissionProfile = resolveClaudePermissionProfile(config, context);
+  const dangerouslySkipPermissions = claudePermissionProfileBypasses(permissionProfile);
+  const requireSubscriptionAuth = asBoolean(config.requireSubscriptionAuth, false);
   const configEnv = parseObject(config.env);
   const workspaceContext = parseObject(context.paperclipWorkspace);
   const workspaceCwd = asString(workspaceContext.cwd, "");
@@ -507,6 +517,38 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const modelEnv = executionTargetIsRemote ? env : effectiveEnv;
   const model = resolveClaudeModel(config.model, modelEnv);
   const billingType = resolveClaudeBillingType(effectiveEnv);
+  if (requireSubscriptionAuth && billingType !== "subscription") {
+    const errorMessage =
+      "requireSubscriptionAuth is enabled but this run would not use Claude subscription auth " +
+      `(resolved billing: ${billingType}). Unset ANTHROPIC_API_KEY and Bedrock/Vertex variables in the ` +
+      "Paperclip server environment and agent env, then sign in with `claude login`.";
+    await onLog("stderr", `[paperclip] ${errorMessage}\n`);
+    return {
+      exitCode: 1,
+      signal: null,
+      timedOut: false,
+      errorCode: "claude_subscription_auth_required",
+      errorMessage,
+      billingType,
+      resultJson: { executionRecovery: { kind: "bootstrap", providerWorkStarted: false } },
+    };
+  }
+  const permissionConflict = findClaudePermissionProfileConflict(permissionProfile, extraArgs);
+  if (permissionConflict) {
+    const errorMessage =
+      `extraArgs contains ${permissionConflict}, which would override the ${permissionProfile.kind === "read_only" ? "read-only" : "configured"} ` +
+      "Claude permission profile. Remove it from the agent's extraArgs.";
+    await onLog("stderr", `[paperclip] ${errorMessage}\n`);
+    return {
+      exitCode: 1,
+      signal: null,
+      timedOut: false,
+      errorCode: "claude_permission_profile_conflict",
+      errorMessage,
+      billingType,
+      resultJson: { executionRecovery: { kind: "bootstrap", providerWorkStarted: false } },
+    };
+  }
   const claudeSkillEntries = await readPaperclipRuntimeSkillEntries(config, __moduleDir);
   const desiredSkillNames = new Set(resolveClaudeDesiredSkillNames(config, claudeSkillEntries));
   // Keep per-run working-copy paths out of the content-addressed system prompt.
@@ -844,10 +886,13 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     attemptInstructionsFilePath: string | undefined,
   ) => {
     const args = ["--print", "--output-format", "stream-json", "--verbose"];
-    if (config.managedAiConnection) args.push("--setting-sources", "user");
+    // Read-only runs ignore the workspace's project/local settings so a repo
+    // cannot pre-approve extra tools.
+    if (config.managedAiConnection || claudePermissionProfileRestrictsSettingSources(permissionProfile)) {
+      args.push("--setting-sources", "user");
+    }
     if (resumeSessionId) args.push("--resume", resumeSessionId);
-    args.push(...buildClaudeExecutionPermissionArgs({
-      dangerouslySkipPermissions,
+    args.push(...buildClaudePermissionProfileArgs(permissionProfile, {
       targetIsRemote: executionTargetIsRemote,
       localProcessUid: process.getuid?.() ?? null,
     }));
@@ -932,6 +977,15 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       commandNotes.push(
         "Using full Claude permission bypass for remote execution, including connected tools.",
       );
+    }
+    if (permissionProfile.kind === "read_only") {
+      commandNotes.push(
+        permissionProfile.reason === "plan_approval_gate"
+          ? "Read-only Claude profile (dontAsk, no edit tools): this issue's plan is not approved for implementation."
+          : "Read-only Claude profile (dontAsk, no edit tools) from the agent's toolProfile.",
+      );
+    } else if (permissionProfile.kind === "mode") {
+      commandNotes.push(`Using Claude permission mode ${permissionProfile.mode}.`);
     }
     if (attemptInstructionsFilePath && !resumeSessionId) {
       commandNotes.push(
@@ -1368,6 +1422,29 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       }
     }
 
+    const readOnlySnapshot = permissionProfile.kind === "read_only" && !executionTargetIsRemote
+      ? await snapshotReadOnlyWorkspace(effectiveExecutionCwd)
+      : null;
+    const enforceReadOnlyWorkspace = async (result: AdapterExecutionResult): Promise<AdapterExecutionResult> => {
+      if (!readOnlySnapshot) return result;
+      const change = describeReadOnlyWorkspaceChange(
+        readOnlySnapshot,
+        await snapshotReadOnlyWorkspace(effectiveExecutionCwd),
+      );
+      if (!change) return result;
+      const errorMessage =
+        `Read-only run modified the workspace ${effectiveExecutionCwd}: ${change}. ` +
+        "Review and revert these changes; the run is not trusted.";
+      await onLog("stderr", `[paperclip] ${errorMessage}\n`);
+      return {
+        ...result,
+        exitCode: result.exitCode && result.exitCode !== 0 ? result.exitCode : 1,
+        errorCode: "read_only_run_modified_workspace",
+        errorMessage,
+        resultJson: { ...(result.resultJson ?? {}), readOnlyWorkspaceViolation: change },
+      };
+    };
+
     const initial = await runAttempt(sessionId ?? null);
     const sessionErrorKind =
       sessionId &&
@@ -1415,10 +1492,14 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
         }
       }
       const retry = await runAttempt(null);
-      return toAdapterResult(retry, { fallbackSessionId: null, clearSessionOnMissingSession: true });
+      return enforceReadOnlyWorkspace(
+        toAdapterResult(retry, { fallbackSessionId: null, clearSessionOnMissingSession: true }),
+      );
     }
 
-    return toAdapterResult(initial, { fallbackSessionId: runtimeSessionId || runtime.sessionId });
+    return enforceReadOnlyWorkspace(
+      toAdapterResult(initial, { fallbackSessionId: runtimeSessionId || runtime.sessionId }),
+    );
   } finally {
     try {
       await providerStop.collectBeforeRestore();

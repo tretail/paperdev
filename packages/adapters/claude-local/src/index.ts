@@ -69,6 +69,10 @@ Core fields:
 - promptTemplate (string, optional): run prompt template
 - maxTurnsPerRun (number, optional): max turns for one run
 - dangerouslySkipPermissions (boolean, optional, default true): allow non-interactive Claude runs to proceed without approval prompts. Local and remote targets receive --dangerously-skip-permissions for all built-in and connected tools. Managed sandbox targets also identify themselves to Claude so root container launches support bypass. Non-sandbox root processes must run Claude as a non-root user; Paperclip does not silently downgrade the requested mode.
+- claudePermissionMode (string, optional): Claude Code --permission-mode for CLI runs ("auto" | "dontAsk" | "plan" | "acceptEdits" | "bypassPermissions"). When set, it replaces dangerouslySkipPermissions and selects the CLI engine (explicit engine="acp" is rejected). "auto" lets Claude Code's classifier approve routine actions without full bypass.
+- allowedTools / disallowedTools (string[], optional): Claude Code tool rules passed with claudePermissionMode or toolProfile="read_only"
+- toolProfile (string, optional): "read_only" runs Claude with --permission-mode dontAsk, without Edit/Write/NotebookEdit, with Bash limited to curl and read-only git, and with workspace project/local settings ignored. A git workspace is checked before and after the run; any change fails the run with read_only_run_modified_workspace. Plan-gated planning runs always use this profile.
+- requireSubscriptionAuth (boolean, optional, default false): fail runs with claude_subscription_auth_required instead of using ANTHROPIC_API_KEY or Bedrock credentials from the server or agent env
 - command (string, optional): defaults to "claude"
 - extraArgs (string[], optional): additional CLI args
 - env (object, optional): KEY=VALUE environment variables

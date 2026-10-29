@@ -32,7 +32,13 @@ import {
 } from "./cli-capabilities.js";
 import { prepareCompatibleClaudeCommand } from "./sandbox-cli-version.js";
 import { isBedrockModelId } from "./models.js";
-import { buildClaudeProbePermissionArgs, claudeSandboxPermissionEnv } from "./permissions.js";
+import {
+  buildClaudePermissionProfileArgs,
+  claudePermissionProfileBypasses,
+  claudePermissionProfileRestrictsSettingSources,
+  claudeSandboxPermissionEnv,
+  resolveClaudePermissionProfile,
+} from "./permissions.js";
 import { prepareSandboxClaudeProbeRuntime } from "./claude-config.js";
 import { resolveClaudeModel, SANDBOX_INSTALL_COMMAND } from "../index.js";
 import { resolveClaudeExecutionEngineForRun, testClaudeAcpEnvironment } from "./acp.js";
@@ -189,6 +195,15 @@ export async function testEnvironment(
 
   const configApiKey = env.ANTHROPIC_API_KEY;
   const hostApiKey = considerHostEnv ? process.env.ANTHROPIC_API_KEY : undefined;
+  if (asBoolean(config.requireSubscriptionAuth, false) && (hasBedrock || isNonEmpty(configApiKey) || isNonEmpty(hostApiKey))) {
+    checks.push({
+      code: "claude_subscription_auth_required",
+      level: "error",
+      message: "requireSubscriptionAuth is enabled, but API-key or Bedrock auth is configured. Runs will fail instead of using it.",
+      detail: hasBedrock ? "Bedrock variables detected." : `ANTHROPIC_API_KEY detected in ${isNonEmpty(configApiKey) ? "adapter config env" : "server environment"}.`,
+      hint: "Unset ANTHROPIC_API_KEY and Bedrock variables, then sign in with `claude login`.",
+    });
+  }
   if (hasBedrock) {
     const source =
       env.CLAUDE_CODE_USE_BEDROCK === "1" ||
@@ -329,7 +344,10 @@ export async function testEnvironment(
       const effort = asString(config.effort, "").trim();
       const chrome = asBoolean(config.chrome, false);
       const maxTurns = asNumber(config.maxTurnsPerRun, 0);
-      const dangerouslySkipPermissions = asBoolean(config.dangerouslySkipPermissions, true);
+      // Probe with the same permission profile the agent's runs use, so an
+      // unavailable mode (for example `auto`) fails the test, not the first run.
+      const permissionProfile = resolveClaudePermissionProfile(config);
+      const dangerouslySkipPermissions = claudePermissionProfileBypasses(permissionProfile);
       Object.assign(env, claudeSandboxPermissionEnv({ dangerouslySkipPermissions, targetIsSandbox }));
       const extraArgs = (() => {
         const fromExtraArgs = asStringArray(config.extraArgs);
@@ -361,9 +379,10 @@ export async function testEnvironment(
       }
 
       const args = ["--print", "-", "--output-format", "stream-json", "--verbose"];
-      if (config.managedAiConnection) args.push("--setting-sources", "user");
-      args.push(...buildClaudeProbePermissionArgs({
-        dangerouslySkipPermissions,
+      if (config.managedAiConnection || claudePermissionProfileRestrictsSettingSources(permissionProfile)) {
+        args.push("--setting-sources", "user");
+      }
+      args.push(...buildClaudePermissionProfileArgs(permissionProfile, {
         targetIsRemote,
         localProcessUid: process.getuid?.() ?? null,
       }));
