@@ -8,7 +8,7 @@ Run Paperclip locally with zero external dependencies.
 ## Prerequisites
 
 - Node.js 24.11+
-- pnpm 9+
+- pnpm 12+
 
 ## Start Dev Server
 

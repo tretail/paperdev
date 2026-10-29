@@ -2167,7 +2167,7 @@ process.stderr.write(${JSON.stringify(stderr)}, () => { process.exitCode = ${cod
         {
           name: "workspace-root",
           private: true,
-          packageManager: "pnpm@9.15.4",
+          packageManager: "pnpm@12.16.1",
         },
         null,
         2,
@@ -2268,7 +2268,7 @@ process.stderr.write(${JSON.stringify(stderr)}, () => { process.exitCode = ${cod
         {
           name: "workspace-root",
           private: true,
-          packageManager: "pnpm@9.15.4",
+          packageManager: "pnpm@12.16.1",
         },
         null,
         2,
@@ -2355,7 +2355,7 @@ process.stderr.write(${JSON.stringify(stderr)}, () => { process.exitCode = ${cod
           {
             name: "workspace-root",
             private: true,
-            packageManager: "pnpm@9.15.4",
+            packageManager: "pnpm@12.16.1",
           },
           null,
           2,
@@ -2596,7 +2596,7 @@ process.stderr.write(${JSON.stringify(stderr)}, () => { process.exitCode = ${cod
           {
             name: "workspace-root",
             private: true,
-            packageManager: "pnpm@9.15.4",
+            packageManager: "pnpm@12.16.1",
           },
           null,
           2,

@@ -16,7 +16,7 @@ parity.
 ## Prerequisites
 
 - Node.js 24.11 or newer
-- pnpm 9 or newer
+- pnpm 12 or newer
 - a stable Rust toolchain with `cargo`
 - a Chromium-compatible browser
 
