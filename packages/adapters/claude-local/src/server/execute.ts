@@ -112,6 +112,7 @@ import {
   resolveClaudeSandboxProfile,
   type ClaudeSandboxProfile,
 } from "./sandbox-profile.js";
+import { cleanupClaudeToolRuntime, stageClaudeToolRuntime } from "./sandbox-tools.js";
 import { resolveClaudeModel, SANDBOX_INSTALL_COMMAND } from "../index.js";
 import {
   createClaudeAcpExecutor,
@@ -889,6 +890,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
 
   // Resolved inside the run's try block so failures settle like other preflight errors.
   let sandboxProfile: ClaudeSandboxProfile | null = null;
+  let toolRuntimeStaged = false;
   const buildClaudeArgs = (
     resumeSessionId: string | null,
     attemptInstructionsFilePath: string | undefined,
@@ -1480,6 +1482,24 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
           `${sandboxProfile.disallowedTools.length} file-tool deny rules.\n`,
       );
     }
+    if (sandboxProfile && sandboxProfile.tools.length > 0) {
+      const toolRuntime = await stageClaudeToolRuntime({
+        runId,
+        tools: sandboxProfile.tools,
+        toolHome: sandboxProfile.toolHome,
+        env,
+        basePath: env.PATH ?? process.env.PATH ?? "",
+      });
+      toolRuntimeStaged = true;
+      Object.assign(env, toolRuntime.env);
+      await onLog(
+        "stdout",
+        `[paperclip] Cloud CLIs for this company: ${sandboxProfile.tools.join(", ")} (credentials in ${sandboxProfile.toolHome}).\n`,
+      );
+      if (toolRuntime.missingBinaries.length > 0) {
+        await onLog("stderr", `[paperclip] Not installed on this machine: ${toolRuntime.missingBinaries.join(", ")}.\n`);
+      }
+    }
 
     const readOnlySnapshot = permissionProfile.kind === "read_only" && !executionTargetIsRemote
       ? await snapshotReadOnlyWorkspace(effectiveExecutionCwd)
@@ -1565,6 +1585,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     } finally {
       if (paperclipBridge) {
         await paperclipBridge.stop();
+      }
+      if (toolRuntimeStaged) {
+        await cleanupClaudeToolRuntime(runId).catch(() => undefined);
       }
       if (restoreRemoteWorkspace) {
         await onLog(

@@ -30,12 +30,11 @@ agents:
         claudeSandbox:
           enabled: true
           isolationRoot: ~/Workspaces
+          # Cloud CLIs this company uses (gh, aws, az, wrangler, supabase).
+          # Each adds its network domains; credentials stay per company.
+          tools:
+            - gh
           allowedDomains:
-            - github.com
-            - api.github.com
-            - uploads.github.com
-            - codeload.github.com
-            - objects.githubusercontent.com
             - registry.npmjs.org
         workspaceStrategy:
           type: git_worktree

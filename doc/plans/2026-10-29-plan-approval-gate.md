@@ -77,6 +77,29 @@ OS, and `touch` was denied.
 Implementer args: worktree write and commit worked. Other-company Read and
 Write were denied by the tool rules, and Bash `cat` there by the OS.
 
+## Addendum: per-company cloud CLIs (`claudeSandbox.tools`)
+
+`sandbox-tools.ts` adds presets for `gh`, `aws`, `az`, `wrangler` and
+`supabase`: network domains, per-company credential locations, and per-run
+HOME wrappers.
+
+Probes (macOS, Claude Code 2.1.312), through the generated runtime:
+
+- **PATH.** Claude's shell rebuilds PATH from login profiles, so wrappers go
+  first through a `ZDOTDIR`/`BASH_ENV` profile. That profile sources any
+  existing launcher profile first.
+- **AWS.** Claude Code always denies reads of any `.aws/config` file, so AWS
+  uses `AWS_CONFIG_FILE` at a neutral path. The SSO cache is HOME-relative,
+  which needs the wrapper.
+- **Supabase** writes to `~/.supabase` on every call, so it needs the HOME
+  wrapper too.
+- **Domains.** Wildcard domains (`*.amazonaws.com`) work.
+- **Raw TCP** (Postgres to Supabase) cannot leave the sandbox.
+- **Read-only agents.** A narrower `denyRead` on the tool home beats the
+  company `allowRead`.
+- **Result.** The staged `aws` wrapper resolved a per-company profile, and
+  `supabase`/`az` ran. STS was reachable, and `~/.aws/config` stayed denied.
+
 ## Not done
 
 - No event trigger for "task completed" discovery.

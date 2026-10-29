@@ -169,6 +169,7 @@ export function findClaudePermissionProfileConflict(
 export interface ClaudeSandboxArgs {
   settings: Record<string, unknown>;
   readOnlyAllowedTools: string[];
+  readOnlyDisallowedTools?: string[];
   disallowedTools: string[];
 }
 
@@ -197,7 +198,11 @@ export function buildClaudePermissionProfileArgs(
     ? [...sandbox.readOnlyAllowedTools, ...CLAUDE_READ_ONLY_ALLOWED_TOOLS.filter((tool) => !UNSCOPED_READ_TOOLS.has(tool))]
     : [...CLAUDE_READ_ONLY_ALLOWED_TOOLS];
   const allowed = [...new Set([...baseAllowed, ...profile.allowedTools])];
-  const disallowed = [...new Set([...CLAUDE_READ_ONLY_DISALLOWED_TOOLS, ...profile.disallowedTools])];
+  const disallowed = [...new Set([
+    ...CLAUDE_READ_ONLY_DISALLOWED_TOOLS,
+    ...profile.disallowedTools,
+    ...(sandbox?.readOnlyDisallowedTools ?? []),
+  ])];
   return [
     "--permission-mode", "dontAsk",
     "--tools", CLAUDE_READ_ONLY_TOOLS.join(","),

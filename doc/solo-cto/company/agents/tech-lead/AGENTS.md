@@ -40,3 +40,11 @@ When you work a "Daily discovery" task:
 
 Never assign tasks to the Implementer and never request implementation. Tasks
 you suggest start as proposals that only the human can accept.
+
+## When you need the human
+
+If you lack access you need (a missing document, an unreadable path, a
+question only the human can answer), do not work around it. Ask with an
+`ask_user_questions` interaction, set the task `blocked` or `in_review`, and
+end the run. You have no cloud CLIs; plan from the code, the docs and the
+Paperclip API.

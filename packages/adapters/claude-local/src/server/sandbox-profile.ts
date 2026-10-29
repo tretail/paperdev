@@ -3,6 +3,14 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import {
+  claudeSandboxToolDomains,
+  companyToolHome,
+  PERSONAL_TOOL_STATE_DIRS,
+  readClaudeSandboxTools,
+  TOOLCHAIN_CACHE_DIRS,
+  type ClaudeSandboxToolName,
+} from "./sandbox-tools.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -23,14 +31,22 @@ export interface ClaudeSandboxConfig {
   isolationRoot: string;
   allowedDomains: string[];
   extraDenyRead: string[];
+  /** Cloud CLIs for full-permission profiles; read-only profiles ignore them. */
+  tools: ClaudeSandboxToolName[];
 }
 
 export interface ClaudeSandboxProfile {
   companyRoot: string;
   /** Sandbox settings passed to Claude via `--settings`. */
   settings: Record<string, unknown>;
+  /** Company tool home holding per-company CLI credentials. */
+  toolHome: string;
+  /** CLIs enabled for this run (empty for read-only profiles). */
+  tools: ClaudeSandboxToolName[];
   /** Tool rules for the read-only profile (dontAsk allowlist). */
   readOnlyAllowedTools: string[];
+  /** Narrower read-only denials inside the allowlist (the tool home). */
+  readOnlyDisallowedTools: string[];
   /** Tool deny rules for full-permission profiles. */
   disallowedTools: string[];
 }
@@ -68,6 +84,7 @@ export function readClaudeSandboxConfig(config: Record<string, unknown>): Claude
     isolationRoot,
     allowedDomains: stringList(record.allowedDomains),
     extraDenyRead: stringList(record.extraDenyRead),
+    tools: readClaudeSandboxTools(record.tools),
   };
 }
 
@@ -158,11 +175,15 @@ export async function resolveClaudeSandboxProfile(input: {
   // even when they live under a denied directory.
   const runtimeReadPaths = [...new Set([promptBundleDir, ...(instructionsDir ? [instructionsDir] : []), ...skillPaths])];
 
-  const secretDirs = [...SECRET_DIRS, ...(input.readOnly ? READ_ONLY_SECRET_DIRS : [])]
+  const secretDirs = [...SECRET_DIRS, ...PERSONAL_TOOL_STATE_DIRS, ...(input.readOnly ? READ_ONLY_SECRET_DIRS : [])]
     .map((dir) => path.join(homeDir, dir));
+  const toolHome = companyToolHome(companyRoot);
+  const tools = input.readOnly ? [] : input.sandbox.tools;
   const extraDenyRead = await Promise.all(input.sandbox.extraDenyRead
     .map((entry) => realpathOrResolved(expandHome(entry, homeDir))));
-  const deniedReadPaths = [isolationRoot, ...secretDirs, ...extraDenyRead];
+  // Read-only agents never see the company's CLI credentials; the narrower
+  // deny wins over the company-wide allow.
+  const deniedReadPaths = [isolationRoot, ...secretDirs, ...extraDenyRead, ...(input.readOnly ? [toolHome] : [])];
 
   const writableGitDir = input.readOnly ? null : await gitCommonDir(cwd);
   const filesystem: Record<string, unknown> = {
@@ -172,7 +193,14 @@ export async function resolveClaudeSandboxProfile(input: {
       ? [companyRoot, ...siblings, promptBundleDir]
       : [...siblings, promptBundleDir],
   };
-  if (writableGitDir && !isWithin(writableGitDir, cwd)) filesystem.allowWrite = [writableGitDir];
+  if (!input.readOnly) {
+    filesystem.allowWrite = [
+      ...(writableGitDir && !isWithin(writableGitDir, cwd) ? [writableGitDir] : []),
+      // Dependency installs and CLI token refreshes.
+      ...TOOLCHAIN_CACHE_DIRS.map((dir) => path.join(homeDir, dir)),
+      ...(tools.length > 0 ? [toolHome] : []),
+    ];
+  }
 
   const settings = {
     sandbox: {
@@ -186,7 +214,9 @@ export async function resolveClaudeSandboxProfile(input: {
       network: {
         // Required on macOS for the Paperclip API on localhost.
         allowLocalBinding: true,
-        allowedDomains: input.readOnly ? [] : input.sandbox.allowedDomains,
+        allowedDomains: input.readOnly
+          ? []
+          : [...new Set([...input.sandbox.allowedDomains, ...claudeSandboxToolDomains(tools)])],
       },
     },
   };
@@ -206,5 +236,9 @@ export async function resolveClaudeSandboxProfile(input: {
     ruleFor("Write", dir),
   ]);
 
-  return { companyRoot, settings, readOnlyAllowedTools, disallowedTools };
+  const readOnlyDisallowedTools = input.readOnly
+    ? [ruleFor("Read", toolHome), ruleFor("Grep", toolHome), ruleFor("Glob", toolHome)]
+    : [];
+
+  return { companyRoot, toolHome, tools, settings, readOnlyAllowedTools, readOnlyDisallowedTools, disallowedTools };
 }

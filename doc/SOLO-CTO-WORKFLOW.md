@@ -134,6 +134,58 @@ SSH does not go through the sandbox's network proxy. Use HTTPS remotes
 authenticated by the GitHub CLI: run `gh auth login` and `gh auth setup-git`
 once, then set `git remote set-url origin https://github.com/<org>/<repo>.git`.
 
+### Cloud CLIs per company
+
+Only the Implementer gets cloud CLIs. Enable them per company with
+`claudeSandbox.tools`, for example `tools: [gh, aws, wrangler]`. Each tool
+adds the network domains it needs. Credentials come from that company only:
+
+| Tool | Where its credentials live | One-time setup (per company) |
+|---|---|---|
+| `gh` / `git` | Paperclip's GitHub connection (managed launchers); otherwise a `GH_TOKEN` project secret | Connect GitHub in Paperclip |
+| `aws` | `<company>/.paperclip-tools/aws/config` plus that folder's SSO cache | `AWS_CONFIG_FILE=~/Workspaces/<company>/.paperclip-tools/aws/config HOME=~/Workspaces/<company>/.paperclip-tools/aws aws configure sso`; add `AWS_PROFILE` to the project env |
+| `az` | `<company>/.paperclip-tools/azure` | `AZURE_CONFIG_DIR=~/Workspaces/<company>/.paperclip-tools/azure az login` |
+| `wrangler` | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` project secrets | Create a scoped API token in Cloudflare |
+| `supabase` | `SUPABASE_ACCESS_TOKEN` project secret | Create an access token in Supabase |
+
+A shell function keeps the AWS commands short:
+
+```sh
+pcaws() { local t=~/Workspaces/$1/.paperclip-tools/aws; shift; AWS_CONFIG_FILE=$t/config HOME=$t aws "$@"; }
+pcaws patlynk sso login --profile patlynk
+```
+
+How it works:
+- Paperclip puts per-run wrappers first on the agent's PATH. They run `aws`
+  and `supabase` with the company tool home as `HOME`.
+- Paperclip sets `AWS_CONFIG_FILE`, `AZURE_CONFIG_DIR` and telemetry
+  opt-outs.
+- Your personal `~/.aws`, `~/.azure`, `~/.supabase`, wrangler config and
+  keychain stay hidden. Claude Code also blocks reading any `.aws/config`
+  file, which is why the AWS config is named `config` inside
+  `.paperclip-tools/aws/`.
+- The tool home sits at the company root, above the repos. The Implementer
+  can write to it, for token refresh. Planner and Tech Lead cannot read it.
+- The Implementer can always write to package caches (`~/.npm`,
+  `~/Library/pnpm`, `~/Library/Caches`, `~/.cache`), so installs work.
+
+### When an agent needs you
+
+Runs are headless, so an agent never waits at a prompt. When a step needs
+you, the agent stops and asks. Examples are an expired AWS SSO session, MFA,
+`az login`, a missing secret, a host the sandbox refuses, or a
+production-affecting command that `auto` mode declines. The agent:
+
+1. posts a question card (`ask_user_questions`) on the task with the exact
+   command to run, for example
+   `AWS_CONFIG_FILE=… HOME=… aws sso login --profile patlynk`;
+2. commits safe work in progress, sets the task `blocked` and ends the run.
+
+You run the command in your own terminal, then answer the card or comment.
+That wakes the agent in the same Claude session, so it keeps its context. It
+re-checks access and continues. Pending cards are also listed among the items
+that need your attention.
+
 ## 4. Enable the gate on a project
 
 1. Open the `App` project → Properties.
@@ -161,11 +213,16 @@ description, for example "Add passwordless login using email magic links".
 **C. Review.** Read the plan in the Plans tab, or as the `plan` document, and
 answer the confirmation card:
 
-- **Approve plan** records who approved, which revision, and when.
-- **Request changes**: the Planner revises the plan, which creates rev N+1, and
-  asks again. Any new plan revision makes earlier approvals stale; the row then
+- **Approve** (the agent may label it "Approve plan") records who approved,
+  which revision, and when.
+- **Request changes**: click **Reject** and type your feedback as the reason.
+  Paperclip treats a rejected plan as "needs revision", moves the task back and
+  wakes the Planner with your reason. The Planner writes rev N+1 and asks
+  again. Any new plan revision makes earlier approvals stale; the row then
   shows *Re-approve rev N*.
-- **Reject**, or cancel the task.
+- **A plain comment** also wakes the Planner. Use it for questions or
+  discussion; Reject is the clear "revise this" signal.
+- To stop entirely, cancel the task.
 
 **D. Implement.** Approval hands the task to the **Implementer** and wakes it.
 It:
@@ -252,6 +309,12 @@ trigger's cron or timezone, switch the trigger off, or pause the routine.
   a deny-write rule beats a narrower allow, so the worktree alone can't be
   carved out. Other companies and secrets stay protected.
 - **Allowed domains can carry data out.** Keep `allowedDomains` short.
+- **Supabase direct database connections don't work.** The sandbox only
+  proxies HTTP(S), so `supabase db push`, `link --password` or `psql` to
+  Supabase fail. Use the Management API, or run them yourself when the agent
+  asks.
+- **Tokens in project env are visible to every shell command** in that
+  company's Implementer runs. Use least-privilege, per-company tokens.
 - **The Implementer's git policy comes from its instructions.** Claude Code
   deny rules did not block `git push` in `auto` mode in our probe. Use GitHub
   branch protection on `main`.

@@ -31,7 +31,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
 
-const sandbox = { isolationRoot: "~/Workspaces", allowedDomains: ["github.com"], extraDenyRead: [] };
+const sandbox = { isolationRoot: "~/Workspaces", allowedDomains: ["github.com"], extraDenyRead: [], tools: [] as never[] };
 
 describe("claudeSandbox config", () => {
   it("is off unless enabled, and requires an isolation root", () => {
@@ -117,5 +117,27 @@ describe("resolveClaudeSandboxProfile", () => {
     expect(args.slice(0, 2)).toEqual(["--permission-mode", "auto"]);
     expect(args).toEqual(expect.arrayContaining(["--disallowedTools", ...profile.disallowedTools]));
     expect(args).toContain("--settings");
+  });
+
+  it("gives the implementer its tools, caches and tool home, and hides the tool home from read-only agents", async () => {
+    const { home, ws, repo, bundle } = await fixture();
+    const withTools = { ...sandbox, tools: ["aws" as const] };
+    const implementer = await resolveClaudeSandboxProfile({ sandbox: withTools, cwd: repo, readOnly: false, promptBundleDir: bundle, homeDir: home });
+    const toolHome = path.join(ws, "a", ".paperclip-tools");
+    const implementerSettings = implementer.settings.sandbox as any;
+    expect(implementer.tools).toEqual(["aws"]);
+    expect(implementer.toolHome).toBe(toolHome);
+    expect(implementerSettings.filesystem.allowWrite).toEqual(expect.arrayContaining([toolHome, path.join(home, ".npm")]));
+    expect(implementerSettings.network.allowedDomains).toEqual(expect.arrayContaining(["github.com", "*.amazonaws.com"]));
+    expect(implementerSettings.filesystem.denyRead).toEqual(expect.arrayContaining([path.join(home, ".azure"), path.join(home, "Library/Preferences/.wrangler")]));
+
+    const planner = await resolveClaudeSandboxProfile({ sandbox: withTools, cwd: repo, readOnly: true, promptBundleDir: bundle, homeDir: home });
+    const plannerSettings = planner.settings.sandbox as any;
+    expect(planner.tools).toEqual([]);
+    expect(plannerSettings.network.allowedDomains).toEqual([]);
+    expect(plannerSettings.filesystem.denyRead).toContain(toolHome);
+    expect(plannerSettings.filesystem.allowWrite).toBeUndefined();
+    const args = buildClaudePermissionProfileArgs(resolveClaudePermissionProfile({ toolProfile: "read_only" }), { targetIsRemote: false }, planner);
+    expect(args.slice(args.indexOf("--disallowedTools") + 1)).toContain(`Read(/${toolHome}/**)`);
   });
 });
