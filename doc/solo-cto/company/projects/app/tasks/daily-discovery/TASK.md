@@ -1,5 +1,5 @@
 ---
-name: Daily discovery
+name: Daily technical discovery
 slug: daily-discovery
 assignee: tech-lead
 project: app

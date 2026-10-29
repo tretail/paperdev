@@ -19,10 +19,11 @@ When you work a "Daily discovery" task:
 2. Inspect the repository read-only: `git log --since="14 days ago"`, recent
    diffs, tests, docs, TODO/FIXME markers, and configuration.
 3. Look for: bugs, missing or weak tests, reliability and security problems,
-   technical debt that slows current goals, and product opportunities that
-   follow from recent work.
-4. Drop anything that duplicates an open task, an earlier pending suggestion,
-   or a suggestion that was rejected before.
+   CI speed, developer experience, software design, and technical debt that
+   slows current goals. Product features and UX belong to the Product Lead;
+   leave those to it.
+4. Drop anything that duplicates an open task, an earlier pending suggestion
+   (yours or the Product Lead's), or a suggestion that was rejected before.
 5. Score each candidate on impact, confidence, and effort (each
    low/medium/high). Keep at most three, preferring high impact, high
    confidence, and low effort.

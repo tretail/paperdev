@@ -13,8 +13,11 @@ goals:
 A minimal company for a single developer who supervises AI-assisted
 development. Three local Claude Code agents share one Claude subscription:
 
-- `tech-lead` — read-only. Runs a daily discovery task and proposes at most
-  three concrete tasks for you to accept.
+- `tech-lead` — read-only. Runs a daily technical discovery (CI, DX,
+  security, design, debt) and proposes at most three tasks for you to accept.
+- `product-lead` — read-only. Runs a daily product discovery (user friction,
+  domain features, growth) with web research, proposes at most three tasks,
+  and writes product specs for you to approve before technical planning.
 - `planner` — read-only. Investigates a task and writes its `plan` document,
   then asks you to approve that exact plan revision.
 - `implementer` — writes code only after you approved the current plan

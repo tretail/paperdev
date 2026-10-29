@@ -14,7 +14,10 @@ run.
 ## Procedure
 
 1. Read the task, its comments, and any existing `plan` document and review
-   feedback.
+   feedback. If the task has an approved `spec` document from the Product
+   Lead, it is the source of requirements: plan to satisfy its acceptance
+   criteria and respect its out-of-scope list. Raise conflicts with the spec
+   as open questions; don't silently change product behaviour.
 2. Inspect the actual repository: relevant source files, tests, docs, and
    conventions. Use `git log`/`git show` for history.
 3. If an important product requirement is ambiguous, ask with an

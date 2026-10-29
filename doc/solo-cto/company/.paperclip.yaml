@@ -10,6 +10,16 @@ agents:
         claudeSandbox:
           enabled: true
           isolationRoot: ~/Workspaces
+  product-lead:
+    adapter:
+      type: claude_local
+      config:
+        engine: cli
+        toolProfile: read_only
+        requireSubscriptionAuth: true
+        claudeSandbox:
+          enabled: true
+          isolationRoot: ~/Workspaces
   planner:
     adapter:
       type: claude_local
@@ -43,4 +53,9 @@ routines:
     triggers:
       - kind: schedule
         cronExpression: "0 8 * * *"
+        timezone: UTC
+  daily-product-discovery:
+    triggers:
+      - kind: schedule
+        cronExpression: "0 9 * * *"
         timezone: UTC
