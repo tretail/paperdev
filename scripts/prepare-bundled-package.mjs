@@ -53,7 +53,7 @@ export function createBundledInstallManifest(publishManifest, bundledDependencie
 // npm consumers cannot inherit the workspace's pnpm overrides or patches.
 // Materialize the already-qualified provider bridge closures in the tarball,
 // with overrides confined to the temporary, scripts-disabled producer graph.
-export function configureBundledProviderOverrides(installManifest, bundledDependencies, rootPackage, profileData) {
+export function configureBundledProviderOverrides(installManifest, bundledDependencies, workspaceOverrides, profileData) {
   const result = structuredClone(installManifest);
   const selected = [];
   for (const [agent, serverPackage, runtimePackage] of [
@@ -69,7 +69,7 @@ export function configureBundledProviderOverrides(installManifest, bundledDepend
       throw new Error(`Bundled ${agent} bridge must match its exact qualified profile`);
     }
     const selector = `${serverPackage}@${profile.agentServerVersion}>${runtimePackage}`;
-    if (rootPackage.pnpm?.overrides?.[selector] !== profile.agentRuntimeVersion) {
+    if (workspaceOverrides?.[selector] !== profile.agentRuntimeVersion) {
       throw new Error(`Bundled ${agent} runtime override must match its qualified profile`);
     }
     const npmSelector = `${serverPackage}@${profile.agentServerVersion}`;
@@ -354,25 +354,35 @@ export function selectBundledDependencyPatches(
   return selectedPatches;
 }
 
-// pnpm-workspace.yaml is the pnpm 12 patch manifest. scripts/provision-worktree.sh
-// embeds the same reader for its install fingerprint; keep the two in sync.
-export function readWorkspacePatchedDependencies(sourceRoot = repoRoot) {
+// Flat string map from one top-level pnpm-workspace.yaml section.
+function readWorkspaceStringMap(sourceRoot, section) {
   const workspacePath = resolve(sourceRoot, "pnpm-workspace.yaml");
   const content = readFileSync(workspacePath, "utf8");
-  const patched = {};
+  const values = {};
   let inSection = false;
   for (const line of content.split("\n")) {
     if (/^\s*(#.*)?$/.test(line)) continue;
     if (/^\S/.test(line)) {
-      inSection = /^patchedDependencies:\s*(#.*)?$/.test(line);
+      inSection = new RegExp(`^${section}:\\s*(#.*)?$`).test(line);
       continue;
     }
     if (!inSection) continue;
     const entry = line.match(/^\s+(?:"([^"]+)"|'([^']+)'|([^\s#"'][^:]*?))\s*:\s*(?:"([^"]+)"|'([^']+)'|([^\s#"'][^#]*?))\s*(#.*)?$/);
-    if (!entry) throw new Error(`Invalid patchedDependencies entry in ${workspacePath}: ${line.trim()}`);
-    patched[entry[1] ?? entry[2] ?? entry[3]] = entry[4] ?? entry[5] ?? entry[6];
+    if (!entry) throw new Error(`Invalid ${section} entry in ${workspacePath}: ${line.trim()}`);
+    values[entry[1] ?? entry[2] ?? entry[3]] = entry[4] ?? entry[5] ?? entry[6];
   }
-  return patched;
+  return values;
+}
+
+// pnpm-workspace.yaml is the pnpm 12 patch manifest. scripts/provision-worktree.sh
+// embeds the same reader for its install fingerprint; keep the two in sync.
+export function readWorkspacePatchedDependencies(sourceRoot = repoRoot) {
+  return readWorkspaceStringMap(sourceRoot, "patchedDependencies");
+}
+
+// pnpm-workspace.yaml is also the only source of pnpm overrides.
+export function readWorkspaceOverrides(sourceRoot = repoRoot) {
+  return readWorkspaceStringMap(sourceRoot, "overrides");
 }
 
 export function applyBundledDependencyPatches(destinationDir, bundledDependencies, sourceRoot = repoRoot) {
@@ -415,11 +425,11 @@ export function prepareBundledPackage(sourceDir, destinationDir, { sourceRoot = 
 
   const deployedPackagePath = resolve(destinationDir, "package.json");
   const publishManifest = materializePublishManifest(sourcePackage);
-  const rootPackage = JSON.parse(readFileSync(resolve(sourceRoot, "package.json"), "utf8"));
+  const workspaceOverrides = readWorkspaceOverrides(sourceRoot);
   const profileData = bundledDependencies.includes("@agentclientprotocol/codex-acp")
     ? JSON.parse(readFileSync(resolve(sourceRoot, "packages/paperclip-runner/acpx-profiles.json"), "utf8")) : undefined;
   const { installManifest, profiles } = configureBundledProviderOverrides(
-    createBundledInstallManifest(publishManifest, bundledDependencies), bundledDependencies, rootPackage, profileData,
+    createBundledInstallManifest(publishManifest, bundledDependencies), bundledDependencies, workspaceOverrides, profileData,
   );
   writeFileSync(deployedPackagePath, `${JSON.stringify(installManifest, null, 2)}\n`);
 

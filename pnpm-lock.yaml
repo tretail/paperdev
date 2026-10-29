@@ -1,3 +1,186 @@
+---
+lockfileVersion: '9.0'
+
+importers:
+
+  .:
+    configDependencies: {}
+    packageManagerDependencies:
+      '@pnpm/exe':
+        specifier: 12.16.1
+        version: 12.16.1
+      pnpm:
+        specifier: 12.16.1
+        version: 12.16.1
+
+packages:
+
+  '@pnpm/exe.android-arm64@12.16.1':
+    resolution: {integrity: sha512-PKf78Ew+i0CBYf0Xc+eMcqQiqyBT+u8XCVg1F5roc98/6wWfdYlWhrUMmEBiKWaJ3JqHxrtt8l1NwZ7qfJt2/Q==}
+    cpu: [arm64]
+    os: [android]
+
+  '@pnpm/exe.android-x64@12.16.1':
+    resolution: {integrity: sha512-xdu7gMbB98pdvhwMeA6612Of515FDlRUtfA/1f7nWPZfPLnEdSRBO2u+1N0XBtQ/ennhPH/lrxB1gC6gnR/cdg==}
+    cpu: [x64]
+    os: [android]
+
+  '@pnpm/exe.darwin-arm64@12.16.1':
+    resolution: {integrity: sha512-pVbmIIbhixiLvADLu1WA3TaW8FZy/D72R1De27WbbFx8/2mxvnsTyFVm4fO9kjpjMY7RzJd48CiQ96p8fO3ebQ==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@pnpm/exe.darwin-x64@12.16.1':
+    resolution: {integrity: sha512-xZvQBFqcZjO7vFKTK3XsJpqY6lnBL9EWSLCzVUPq3kZ94+D96gwJCa76xxGNK8Cj32f4eeM91Qg+yNRR4sRpDw==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@pnpm/exe.freebsd-x64@12.16.1':
+    resolution: {integrity: sha512-zTtunfi9mBhRXiXEJYfwiJj0tk7MgTSfqDSRh+Az9FZ9THazVIiQiVNS8jpcsftDOqu7LKNffQdjmgwHDThfUg==}
+    cpu: [x64]
+    os: [freebsd]
+
+  '@pnpm/exe.linux-arm64-musl@12.16.1':
+    resolution: {integrity: sha512-BJ3mOmcmQgcUo92Ee/WfEOt1pRiv3y2MMAkhEiYHd85UiPpHTfFhv+SpCbALmfExzXk3UlaRtMYwHlkQymc4VA==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@pnpm/exe.linux-arm64@12.16.1':
+    resolution: {integrity: sha512-JaRd5gNxwdNGBBkrZFt8bknrK4YmHVJBW0JMhUQ0fJ0dEYp6C2GT9ExaCqOO8EwYEyqM+jpKgJIK+8WFaJy3ew==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@pnpm/exe.linux-ppc64@12.16.1':
+    resolution: {integrity: sha512-FnSV0Jv40S1cMv7vFNWwvu0X567Lec4L4HCRead3CFcD6zQDNbGw81s8N5bcKPahtPD9ApVuhsbmFCx4rw6RMw==}
+    cpu: [ppc64]
+    os: [linux]
+    libc: [glibc]
+
+  '@pnpm/exe.linux-riscv64@12.16.1':
+    resolution: {integrity: sha512-C1Sww4FN5IttD4atRRhAKmQtSGWVp04ZAKNxO8pfu2bkRPwOW+7v+2DH1Xs1W+kZYYpO86BYDvUcadefF+AgaQ==}
+    cpu: [riscv64]
+    os: [linux]
+    libc: [glibc]
+
+  '@pnpm/exe.linux-s390x@12.16.1':
+    resolution: {integrity: sha512-kn2fautsTcxIMODoovQVqZyfpDRdNgGkoeVqNdrKqbeBBvrEl+fXLkmZiq5xDht1LMr4sYiCNcsMfNMT6JPFmg==}
+    cpu: [s390x]
+    os: [linux]
+    libc: [glibc]
+
+  '@pnpm/exe.linux-x64-musl@12.16.1':
+    resolution: {integrity: sha512-PM6ccHCOe/O9SsTflTJTYWfwogJZa6EmUvpnwZgiPguJBddh20wDQKgxUPXf48rDsPm9vMsIij0uHswwwbXL8g==}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@pnpm/exe.linux-x64@12.16.1':
+    resolution: {integrity: sha512-RK//8ZLcXGW8A2k8bQOXZDBN1Qu92zN4dYnG1bzj1zoQ1fkZ6jNzZ1AvXtsfGVma795CJtvoaF5bLXf4l/FIUw==}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@pnpm/exe.win32-arm64@12.16.1':
+    resolution: {integrity: sha512-Ox3kNNVxtGw6pK7SVejmeOUgHhUTZgAM7NQQ6cU7frPw3ix9+j7d2MGbRg3fyEFAaKWq8ZAZLTQGcDyLnAu+qA==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@pnpm/exe.win32-x64@12.16.1':
+    resolution: {integrity: sha512-k+FhRJ0ttphFoFIVB1Sk4v76YJAulafmA/Ly57cysesUhhIzVlApeOShUz0jXubKx317TThlEfpQrukldnqORA==}
+    cpu: [x64]
+    os: [win32]
+
+  '@pnpm/exe@12.16.1':
+    resolution: {integrity: sha512-Opsh2R7IuFY3ekd0C282Tmzgr5hiSlKMOv05/3dJXUrrp5NbmjC1Cm5PCFsa8xsiXY7z4oSkI4Qof1LjTkgAJg==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  pnpm@12.16.1:
+    resolution: {integrity: sha512-CR0d7nknV1Zhsl2rPCrjHK/BxU1rce1qZgDPDByxBDSkR+rhQBXxsj4ua+3u1535SpMuIWTSgyKA3OP7MvZW0Q==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+snapshots:
+
+  '@pnpm/exe.android-arm64@12.16.1':
+    optional: true
+
+  '@pnpm/exe.android-x64@12.16.1':
+    optional: true
+
+  '@pnpm/exe.darwin-arm64@12.16.1':
+    optional: true
+
+  '@pnpm/exe.darwin-x64@12.16.1':
+    optional: true
+
+  '@pnpm/exe.freebsd-x64@12.16.1':
+    optional: true
+
+  '@pnpm/exe.linux-arm64-musl@12.16.1':
+    optional: true
+
+  '@pnpm/exe.linux-arm64@12.16.1':
+    optional: true
+
+  '@pnpm/exe.linux-ppc64@12.16.1':
+    optional: true
+
+  '@pnpm/exe.linux-riscv64@12.16.1':
+    optional: true
+
+  '@pnpm/exe.linux-s390x@12.16.1':
+    optional: true
+
+  '@pnpm/exe.linux-x64-musl@12.16.1':
+    optional: true
+
+  '@pnpm/exe.linux-x64@12.16.1':
+    optional: true
+
+  '@pnpm/exe.win32-arm64@12.16.1':
+    optional: true
+
+  '@pnpm/exe.win32-x64@12.16.1':
+    optional: true
+
+  '@pnpm/exe@12.16.1':
+    optionalDependencies:
+      '@pnpm/exe.android-arm64': 12.16.1
+      '@pnpm/exe.android-x64': 12.16.1
+      '@pnpm/exe.darwin-arm64': 12.16.1
+      '@pnpm/exe.darwin-x64': 12.16.1
+      '@pnpm/exe.freebsd-x64': 12.16.1
+      '@pnpm/exe.linux-arm64': 12.16.1
+      '@pnpm/exe.linux-arm64-musl': 12.16.1
+      '@pnpm/exe.linux-ppc64': 12.16.1
+      '@pnpm/exe.linux-riscv64': 12.16.1
+      '@pnpm/exe.linux-s390x': 12.16.1
+      '@pnpm/exe.linux-x64': 12.16.1
+      '@pnpm/exe.linux-x64-musl': 12.16.1
+      '@pnpm/exe.win32-arm64': 12.16.1
+      '@pnpm/exe.win32-x64': 12.16.1
+
+  pnpm@12.16.1:
+    optionalDependencies:
+      '@pnpm/exe.android-arm64': 12.16.1
+      '@pnpm/exe.android-x64': 12.16.1
+      '@pnpm/exe.darwin-arm64': 12.16.1
+      '@pnpm/exe.darwin-x64': 12.16.1
+      '@pnpm/exe.freebsd-x64': 12.16.1
+      '@pnpm/exe.linux-arm64': 12.16.1
+      '@pnpm/exe.linux-arm64-musl': 12.16.1
+      '@pnpm/exe.linux-ppc64': 12.16.1
+      '@pnpm/exe.linux-riscv64': 12.16.1
+      '@pnpm/exe.linux-s390x': 12.16.1
+      '@pnpm/exe.linux-x64': 12.16.1
+      '@pnpm/exe.linux-x64-musl': 12.16.1
+      '@pnpm/exe.win32-arm64': 12.16.1
+      '@pnpm/exe.win32-x64': 12.16.1
+
+---
 lockfileVersion: '9.0'
 
 settings:
@@ -15,42 +198,18 @@ overrides:
   '@lezer/common': ^1.5.2
 
 patchedDependencies:
-  '@agentclientprotocol/claude-agent-acp@0.73.0':
-    hash: xjlrz3rllh2ztafbdiywpfh2rq
-    path: patches/@agentclientprotocol__claude-agent-acp@0.73.0.patch
-  '@agentclientprotocol/codex-acp@1.6.2':
-    hash: 2iynuypg76nxmydiylgtffhr7e
-    path: patches/@agentclientprotocol__codex-acp@1.6.2.patch
-  '@chat-adapter/discord@4.39.0':
-    hash: nywlhls7dd4npegrgax7jqdbxa
-    path: patches/@chat-adapter__discord@4.39.0.patch
-  '@chat-adapter/github@4.39.0':
-    hash: x25bk7vvljpm57viwan5qoaddi
-    path: patches/@chat-adapter__github@4.39.0.patch
-  '@chat-adapter/slack@4.39.0':
-    hash: 226jj24akljccsfbw7bcxujz4u
-    path: patches/@chat-adapter__slack@4.39.0.patch
-  '@chat-adapter/teams@4.39.0':
-    hash: jfm44m5wrw3jrn2jijafzk7s5a
-    path: patches/@chat-adapter__teams@4.39.0.patch
-  '@chat-adapter/telegram@4.39.0':
-    hash: wl4uiwewrapxf5u6ksnm7elv44
-    path: patches/@chat-adapter__telegram@4.39.0.patch
-  '@discordjs/ws@1.2.3':
-    hash: vbylpnnxt5av2zdnuqmf6hjyjy
-    path: patches/@discordjs__ws@1.2.3.patch
-  acpx@0.12.0:
-    hash: 6st5fzvttegjv64llnfegwwpca
-    path: patches/acpx@0.12.0.patch
-  acpx@0.13.1:
-    hash: xh3fclih3ztrbsibpfnxdcx7pe
-    path: patches/acpx@0.13.1.patch
-  embedded-postgres@18.1.0-beta.16:
-    hash: 55uhvnotpqyiy37rn3pqpukhei
-    path: patches/embedded-postgres@18.1.0-beta.16.patch
-  postgres@3.4.9:
-    hash: 6q4cic6qawywsyeo2spgnjamda
-    path: patches/postgres@3.4.9.patch
+  '@agentclientprotocol/claude-agent-acp@0.73.0': e3df3766225014ac09aebc52df1100718d88022dcc9f13342653a46c8a29ed72
+  '@agentclientprotocol/codex-acp@1.6.2': 3ebc068160c20897ffa4ac984cd00b833f58275bbb634e0fa70cb8ef35051bb5
+  '@chat-adapter/discord@4.39.0': e1ffaf4879f4646c73b531e8310f64fe58ce81b3fbba2c4dbf007a2dcd471e2b
+  '@chat-adapter/github@4.39.0': 88c3624eecb6a4e9b300e9cfd610f3c5b84c10bd6e3a5b3d019a5e25bbd9c425
+  '@chat-adapter/slack@4.39.0': b3f7862ad641a4614f1c47c81577a9808d108707c88d0bfbc40c100bb678750d
+  '@chat-adapter/teams@4.39.0': ea214c8e08e093623f262a52e2dd98af101b0d0c0d4403cce2f86b5507c93d4a
+  '@chat-adapter/telegram@4.39.0': 0db7648c197f1853bcbddc1b162db215a2fd4b3ae23d82b529601219c56e8a55
+  '@discordjs/ws@1.2.3': 001e315a33852c603d3c5ec8ced17ebbd9eb28d78b967aff6dcec307014b7652
+  acpx@0.12.0: 76be3d72d2552dfe0a486156e7f1c07dc59dab9d380336a233cb14459791dcb0
+  acpx@0.13.1: 1e7dae8c83bf8620f53f2bea13c175eeff95e7e955783f6f529bb1dcbdcdb6d2
+  embedded-postgres@18.1.0-beta.16: d8b1e087e95f559a6342fc15954f11af22d9dca43a7fcca5762b6459913b5800
+  postgres@3.4.9: c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc
 
 importers:
 
@@ -136,10 +295,10 @@ importers:
         version: 17.4.2
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda))
+        version: 0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc))
       embedded-postgres:
         specifier: ^18.1.0-beta.16
-        version: 18.1.0-beta.16(patch_hash=55uhvnotpqyiy37rn3pqpukhei)
+        version: 18.1.0-beta.16(patch_hash=d8b1e087e95f559a6342fc15954f11af22d9dca43a7fcca5762b6459913b5800)
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
@@ -161,7 +320,7 @@ importers:
         version: link:../shared
       acpx:
         specifier: 0.12.0
-        version: 0.12.0(patch_hash=6st5fzvttegjv64llnfegwwpca)
+        version: 0.12.0(patch_hash=76be3d72d2552dfe0a486156e7f1c07dc59dab9d380336a233cb14459791dcb0)
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
@@ -183,7 +342,7 @@ importers:
     dependencies:
       '@agentclientprotocol/claude-agent-acp':
         specifier: ^0.73.0
-        version: 0.73.0(patch_hash=xjlrz3rllh2ztafbdiywpfh2rq)(@anthropic-ai/sdk@0.129.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.31.0(zod@4.6.5))
+        version: 0.73.0(patch_hash=e3df3766225014ac09aebc52df1100718d88022dcc9f13342653a46c8a29ed72)(@anthropic-ai/sdk@0.129.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.31.0)
       '@anthropic-ai/sdk':
         specifier: 0.129.0
         version: 0.129.0(zod@4.6.5)
@@ -208,7 +367,7 @@ importers:
     dependencies:
       '@agentclientprotocol/codex-acp':
         specifier: ^1.6.2
-        version: 1.6.2(patch_hash=2iynuypg76nxmydiylgtffhr7e)
+        version: 1.6.2(patch_hash=3ebc068160c20897ffa4ac984cd00b833f58275bbb634e0fa70cb8ef35051bb5)
       '@paperclipai/adapter-utils':
         specifier: workspace:*
         version: link:../../adapter-utils
@@ -408,13 +567,13 @@ importers:
         version: link:../shared
       drizzle-orm:
         specifier: ^0.45.2
-        version: 0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda))
+        version: 0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc))
       embedded-postgres:
         specifier: ^18.1.0-beta.16
-        version: 18.1.0-beta.16(patch_hash=55uhvnotpqyiy37rn3pqpukhei)
+        version: 18.1.0-beta.16(patch_hash=d8b1e087e95f559a6342fc15954f11af22d9dca43a7fcca5762b6459913b5800)
       postgres:
         specifier: ^3.4.9
-        version: 3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda)
+        version: 3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc)
     devDependencies:
       '@types/node':
         specifier: ^24.0.0
@@ -436,7 +595,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.31.0
-        version: 1.31.0(zod@4.4.3)
+        version: 1.31.0
       googleapis:
         specifier: ^182.0.0
         version: 182.0.0
@@ -458,7 +617,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.31.0
-        version: 1.31.0(zod@4.4.3)
+        version: 1.31.0
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -477,7 +636,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.31.0
-        version: 1.31.0(zod@4.4.3)
+        version: 1.31.0
       '@paperclipai/shared':
         specifier: workspace:*
         version: link:../shared
@@ -508,16 +667,16 @@ importers:
     dependencies:
       '@agentclientprotocol/claude-agent-acp':
         specifier: 0.73.0
-        version: 0.73.0(patch_hash=xjlrz3rllh2ztafbdiywpfh2rq)(@anthropic-ai/sdk@0.129.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.31.0(zod@4.6.5))
+        version: 0.73.0(patch_hash=e3df3766225014ac09aebc52df1100718d88022dcc9f13342653a46c8a29ed72)(@anthropic-ai/sdk@0.129.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.31.0)
       '@agentclientprotocol/codex-acp':
         specifier: 1.6.2
-        version: 1.6.2(patch_hash=2iynuypg76nxmydiylgtffhr7e)
+        version: 1.6.2(patch_hash=3ebc068160c20897ffa4ac984cd00b833f58275bbb634e0fa70cb8ef35051bb5)
       '@openai/codex':
         specifier: 0.160.0
         version: 0.160.0
       acpx:
         specifier: 0.13.1
-        version: 0.13.1(patch_hash=xh3fclih3ztrbsibpfnxdcx7pe)
+        version: 0.13.1(patch_hash=1e7dae8c83bf8620f53f2bea13c175eeff95e7e955783f6f529bb1dcbdcdb6d2)
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
@@ -536,16 +695,6 @@ importers:
       smol-toml:
         specifier: ^1.9.1
         version: 1.9.1
-    optionalDependencies:
-      '@github/copilot-darwin-arm64':
-        specifier: 1.0.88
-        version: 1.0.88
-      '@github/copilot-darwin-x64':
-        specifier: 1.0.88
-        version: 1.0.88
-      '@github/copilot-linux-x64':
-        specifier: 1.0.88
-        version: 1.0.88
     devDependencies:
       '@paperclipai/paperclip-eval-kernel':
         specifier: workspace:*
@@ -586,6 +735,16 @@ importers:
       vitest:
         specifier: ^5.0.3
         version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@6.4.3(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.15)(yaml@2.9.1))
+    optionalDependencies:
+      '@github/copilot-darwin-arm64':
+        specifier: 1.0.88
+        version: 1.0.88
+      '@github/copilot-darwin-x64':
+        specifier: 1.0.88
+        version: 1.0.88
+      '@github/copilot-linux-x64':
+        specifier: 1.0.88
+        version: 1.0.88
 
   packages/plugins/create-paperclip-plugin:
     dependencies:
@@ -898,10 +1057,10 @@ importers:
         version: 0.5.0
       '@agentclientprotocol/claude-agent-acp':
         specifier: 0.73.0
-        version: 0.73.0(patch_hash=xjlrz3rllh2ztafbdiywpfh2rq)(@anthropic-ai/sdk@0.129.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.31.0(zod@4.4.3))
+        version: 0.73.0(patch_hash=e3df3766225014ac09aebc52df1100718d88022dcc9f13342653a46c8a29ed72)(@anthropic-ai/sdk@0.129.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.31.0)
       '@agentclientprotocol/codex-acp':
         specifier: 1.6.2
-        version: 1.6.2(patch_hash=2iynuypg76nxmydiylgtffhr7e)
+        version: 1.6.2(patch_hash=3ebc068160c20897ffa4ac984cd00b833f58275bbb634e0fa70cb8ef35051bb5)
       '@ai-sdk/amazon-bedrock':
         specifier: 5.0.113
         version: 5.0.113(zod@4.4.3)
@@ -922,28 +1081,28 @@ importers:
         version: 3.1141.0
       '@chat-adapter/discord':
         specifier: 4.39.0
-        version: 4.39.0(patch_hash=nywlhls7dd4npegrgax7jqdbxa)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
+        version: 4.39.0(patch_hash=e1ffaf4879f4646c73b531e8310f64fe58ce81b3fbba2c4dbf007a2dcd471e2b)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
       '@chat-adapter/github':
         specifier: 4.39.0
-        version: 4.39.0(patch_hash=x25bk7vvljpm57viwan5qoaddi)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
+        version: 4.39.0(patch_hash=88c3624eecb6a4e9b300e9cfd610f3c5b84c10bd6e3a5b3d019a5e25bbd9c425)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
       '@chat-adapter/slack':
         specifier: 4.39.0
-        version: 4.39.0(patch_hash=226jj24akljccsfbw7bcxujz4u)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
+        version: 4.39.0(patch_hash=b3f7862ad641a4614f1c47c81577a9808d108707c88d0bfbc40c100bb678750d)(ai@7.0.130(zod@4.4.3))(debug@4.4.3)(zod@4.4.3)
       '@chat-adapter/teams':
         specifier: 4.39.0
-        version: 4.39.0(patch_hash=jfm44m5wrw3jrn2jijafzk7s5a)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
+        version: 4.39.0(patch_hash=ea214c8e08e093623f262a52e2dd98af101b0d0c0d4403cce2f86b5507c93d4a)(ai@7.0.130(zod@4.4.3))(debug@4.4.3)(zod@4.4.3)
       '@chat-adapter/telegram':
         specifier: 4.39.0
-        version: 4.39.0(patch_hash=wl4uiwewrapxf5u6ksnm7elv44)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
+        version: 4.39.0(patch_hash=0db7648c197f1853bcbddc1b162db215a2fd4b3ae23d82b529601219c56e8a55)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
       '@discordjs/ws':
         specifier: 1.2.3
-        version: 1.2.3(patch_hash=vbylpnnxt5av2zdnuqmf6hjyjy)
+        version: 1.2.3(patch_hash=001e315a33852c603d3c5ec8ced17ebbd9eb28d78b967aff6dcec307014b7652)
       '@grpc/grpc-js':
         specifier: 1.14.5
         version: 1.14.5
       '@modelcontextprotocol/sdk':
         specifier: ^1.31.0
-        version: 1.31.0(zod@4.4.3)
+        version: 1.31.0
       '@openrouter/ai-sdk-provider':
         specifier: 3.1.0
         version: 3.1.0(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
@@ -1009,13 +1168,13 @@ importers:
         version: 2.1.0(@grpc/grpc-js@1.14.5)(nice-grpc-common@2.0.4)(nice-grpc@2.1.17)
       '@vercel/connect':
         specifier: 2.3.3
-        version: 2.3.3(@chat-adapter/slack@4.39.0(patch_hash=226jj24akljccsfbw7bcxujz4u)(ai@7.0.130(zod@4.4.3))(zod@4.4.3))(@modelcontextprotocol/sdk@1.31.0(zod@4.4.3))(ai@7.0.130(zod@4.4.3))(better-auth@1.7.2(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda)))(pg@8.18.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))))
+        version: 2.3.3(@chat-adapter/slack@4.39.0(patch_hash=b3f7862ad641a4614f1c47c81577a9808d108707c88d0bfbc40c100bb678750d)(ai@7.0.130(zod@4.4.3))(debug@4.4.3)(zod@4.4.3))(@modelcontextprotocol/sdk@1.31.0)(ai@7.0.130(zod@4.4.3))(better-auth@1.7.2(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc)))(pg@8.18.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))))
       acorn:
         specifier: 8.18.0
         version: 8.18.0
       acpx:
         specifier: 0.13.1
-        version: 0.13.1(patch_hash=xh3fclih3ztrbsibpfnxdcx7pe)
+        version: 0.13.1(patch_hash=1e7dae8c83bf8620f53f2bea13c175eeff95e7e955783f6f529bb1dcbdcdb6d2)
       ai:
         specifier: 7.0.130
         version: 7.0.130(zod@4.4.3)
@@ -1027,7 +1186,7 @@ importers:
         version: 3.0.1(ajv@8.20.0)
       better-auth:
         specifier: 1.7.2
-        version: 1.7.2(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda)))(pg@8.18.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))
+        version: 1.7.2(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc)))(pg@8.18.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))
       chat:
         specifier: 4.39.0
         version: 4.39.0(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
@@ -1048,10 +1207,10 @@ importers:
         version: 17.4.2
       drizzle-orm:
         specifier: ^0.45.2
-        version: 0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda))
+        version: 0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc))
       embedded-postgres:
         specifier: ^18.1.0-beta.16
-        version: 18.1.0-beta.16(patch_hash=55uhvnotpqyiy37rn3pqpukhei)
+        version: 18.1.0-beta.16(patch_hash=d8b1e087e95f559a6342fc15954f11af22d9dca43a7fcca5762b6459913b5800)
       express:
         specifier: ^5.1.0
         version: 5.2.1
@@ -1106,16 +1265,6 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
-    optionalDependencies:
-      '@github/copilot-darwin-arm64':
-        specifier: 1.0.88
-        version: 1.0.88
-      '@github/copilot-darwin-x64':
-        specifier: 1.0.88
-        version: 1.0.88
-      '@github/copilot-linux-x64':
-        specifier: 1.0.88
-        version: 1.0.88
     devDependencies:
       '@opentelemetry/context-async-hooks':
         specifier: 2.10.0
@@ -1174,6 +1323,16 @@ importers:
       vitest:
         specifier: ^5.0.3
         version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+    optionalDependencies:
+      '@github/copilot-darwin-arm64':
+        specifier: 1.0.88
+        version: 1.0.88
+      '@github/copilot-darwin-x64':
+        specifier: 1.0.88
+        version: 1.0.88
+      '@github/copilot-linux-x64':
+        specifier: 1.0.88
+        version: 1.0.88
 
   ui:
     dependencies:
@@ -9345,25 +9504,16 @@ snapshots:
 
   '@adobe/css-tools@4.5.0': {}
 
-  '@agentclientprotocol/claude-agent-acp@0.73.0(patch_hash=xjlrz3rllh2ztafbdiywpfh2rq)(@anthropic-ai/sdk@0.129.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.31.0(zod@4.4.3))':
+  '@agentclientprotocol/claude-agent-acp@0.73.0(patch_hash=e3df3766225014ac09aebc52df1100718d88022dcc9f13342653a46c8a29ed72)(@anthropic-ai/sdk@0.129.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.31.0)':
     dependencies:
       '@agentclientprotocol/sdk': 1.4.0(zod@4.4.3)
-      '@anthropic-ai/claude-agent-sdk': 0.3.286(@anthropic-ai/sdk@0.129.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.31.0(zod@4.4.3))(zod@4.4.3)
+      '@anthropic-ai/claude-agent-sdk': 0.3.286(@anthropic-ai/sdk@0.129.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.31.0)(zod@4.4.3)
       zod: 4.4.3
     transitivePeerDependencies:
       - '@anthropic-ai/sdk'
       - '@modelcontextprotocol/sdk'
 
-  '@agentclientprotocol/claude-agent-acp@0.73.0(patch_hash=xjlrz3rllh2ztafbdiywpfh2rq)(@anthropic-ai/sdk@0.129.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.31.0(zod@4.6.5))':
-    dependencies:
-      '@agentclientprotocol/sdk': 1.4.0(zod@4.4.3)
-      '@anthropic-ai/claude-agent-sdk': 0.3.286(@anthropic-ai/sdk@0.129.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.31.0(zod@4.6.5))(zod@4.4.3)
-      zod: 4.4.3
-    transitivePeerDependencies:
-      - '@anthropic-ai/sdk'
-      - '@modelcontextprotocol/sdk'
-
-  '@agentclientprotocol/codex-acp@1.6.2(patch_hash=2iynuypg76nxmydiylgtffhr7e)':
+  '@agentclientprotocol/codex-acp@1.6.2(patch_hash=3ebc068160c20897ffa4ac984cd00b833f58275bbb634e0fa70cb8ef35051bb5)':
     dependencies:
       '@agentclientprotocol/sdk': 1.4.0(zod@4.4.3)
       '@openai/codex': 0.160.0
@@ -9501,25 +9651,10 @@ snapshots:
   '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.286':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk@0.3.286(@anthropic-ai/sdk@0.129.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.31.0(zod@4.4.3))(zod@4.4.3)':
-    dependencies:
-      '@anthropic-ai/sdk': 0.129.0(zod@4.4.3)
-      '@modelcontextprotocol/sdk': 1.31.0(zod@4.4.3)
-      zod: 4.4.3
-    optionalDependencies:
-      '@anthropic-ai/claude-agent-sdk-darwin-arm64': 0.3.286
-      '@anthropic-ai/claude-agent-sdk-darwin-x64': 0.3.286
-      '@anthropic-ai/claude-agent-sdk-linux-arm64': 0.3.286
-      '@anthropic-ai/claude-agent-sdk-linux-arm64-musl': 0.3.286
-      '@anthropic-ai/claude-agent-sdk-linux-x64': 0.3.286
-      '@anthropic-ai/claude-agent-sdk-linux-x64-musl': 0.3.286
-      '@anthropic-ai/claude-agent-sdk-win32-arm64': 0.3.286
-      '@anthropic-ai/claude-agent-sdk-win32-x64': 0.3.286
-
-  '@anthropic-ai/claude-agent-sdk@0.3.286(@anthropic-ai/sdk@0.129.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.31.0(zod@4.6.5))(zod@4.4.3)':
+  '@anthropic-ai/claude-agent-sdk@0.3.286(@anthropic-ai/sdk@0.129.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.31.0)(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.129.0(zod@4.6.5)
-      '@modelcontextprotocol/sdk': 1.31.0(zod@4.6.5)
+      '@modelcontextprotocol/sdk': 1.31.0
       zod: 4.4.3
     optionalDependencies:
       '@anthropic-ai/claude-agent-sdk-darwin-arm64': 0.3.286
@@ -9530,13 +9665,6 @@ snapshots:
       '@anthropic-ai/claude-agent-sdk-linux-x64-musl': 0.3.286
       '@anthropic-ai/claude-agent-sdk-win32-arm64': 0.3.286
       '@anthropic-ai/claude-agent-sdk-win32-x64': 0.3.286
-
-  '@anthropic-ai/sdk@0.129.0(zod@4.4.3)':
-    dependencies:
-      json-schema-to-ts: 3.1.1
-      standardwebhooks: 1.1.1
-    optionalDependencies:
-      zod: 4.4.3
 
   '@anthropic-ai/sdk@0.129.0(zod@4.6.5)':
     dependencies:
@@ -9936,12 +10064,12 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
 
-  '@better-auth/drizzle-adapter@1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.3))(@better-auth/utils@0.4.2)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda)))':
+  '@better-auth/drizzle-adapter@1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.3))(@better-auth/utils@0.4.2)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc)))':
     dependencies:
       '@better-auth/core': 1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.3)
       '@better-auth/utils': 0.4.2
     optionalDependencies:
-      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda))
+      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc))
 
   '@better-auth/kysely-adapter@1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.3))(@better-auth/utils@0.4.2)(kysely@0.29.5)':
     dependencies:
@@ -9991,7 +10119,7 @@ snapshots:
 
   '@bufbuild/protobuf@2.15.0': {}
 
-  '@chat-adapter/discord@4.39.0(patch_hash=nywlhls7dd4npegrgax7jqdbxa)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)':
+  '@chat-adapter/discord@4.39.0(patch_hash=e1ffaf4879f4646c73b531e8310f64fe58ce81b3fbba2c4dbf007a2dcd471e2b)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)':
     dependencies:
       '@chat-adapter/shared': 4.39.0(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
       chat: 4.39.0(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
@@ -10006,7 +10134,7 @@ snapshots:
       - workflow
       - zod
 
-  '@chat-adapter/github@4.39.0(patch_hash=x25bk7vvljpm57viwan5qoaddi)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)':
+  '@chat-adapter/github@4.39.0(patch_hash=88c3624eecb6a4e9b300e9cfd610f3c5b84c10bd6e3a5b3d019a5e25bbd9c425)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)':
     dependencies:
       '@chat-adapter/shared': 4.39.0(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
       '@octokit/auth-app': 8.3.1
@@ -10027,11 +10155,11 @@ snapshots:
       - workflow
       - zod
 
-  '@chat-adapter/slack@4.39.0(patch_hash=226jj24akljccsfbw7bcxujz4u)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)':
+  '@chat-adapter/slack@4.39.0(patch_hash=b3f7862ad641a4614f1c47c81577a9808d108707c88d0bfbc40c100bb678750d)(ai@7.0.130(zod@4.4.3))(debug@4.4.3)(zod@4.4.3)':
     dependencies:
       '@chat-adapter/shared': 4.39.0(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
-      '@slack/socket-mode': 2.0.7
-      '@slack/web-api': 7.19.0
+      '@slack/socket-mode': 2.0.7(debug@4.4.3)
+      '@slack/web-api': 7.19.0(debug@4.4.3)
       chat: 4.39.0(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
     transitivePeerDependencies:
       - ai
@@ -10042,11 +10170,11 @@ snapshots:
       - workflow
       - zod
 
-  '@chat-adapter/teams@4.39.0(patch_hash=jfm44m5wrw3jrn2jijafzk7s5a)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)':
+  '@chat-adapter/teams@4.39.0(patch_hash=ea214c8e08e093623f262a52e2dd98af101b0d0c0d4403cce2f86b5507c93d4a)(ai@7.0.130(zod@4.4.3))(debug@4.4.3)(zod@4.4.3)':
     dependencies:
       '@chat-adapter/shared': 4.39.0(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
-      '@microsoft/teams.api': 2.0.16
-      '@microsoft/teams.apps': 2.0.16
+      '@microsoft/teams.api': 2.0.16(debug@4.4.3)
+      '@microsoft/teams.apps': 2.0.16(debug@4.4.3)
       '@microsoft/teams.cards': 2.0.16
       '@microsoft/teams.graph-endpoints': 2.0.16
       chat: 4.39.0(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
@@ -10057,7 +10185,7 @@ snapshots:
       - workflow
       - zod
 
-  '@chat-adapter/telegram@4.39.0(patch_hash=wl4uiwewrapxf5u6ksnm7elv44)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)':
+  '@chat-adapter/telegram@4.39.0(patch_hash=0db7648c197f1853bcbddc1b162db215a2fd4b3ae23d82b529601219c56e8a55)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)':
     dependencies:
       '@chat-adapter/shared': 4.39.0(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
       chat: 4.39.0(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
@@ -10478,7 +10606,7 @@ snapshots:
     dependencies:
       discord-api-types: 0.38.55
 
-  '@discordjs/ws@1.2.3(patch_hash=vbylpnnxt5av2zdnuqmf6hjyjy)':
+  '@discordjs/ws@1.2.3(patch_hash=001e315a33852c603d3c5ec8ced17ebbd9eb28d78b967aff6dcec307014b7652)':
     dependencies:
       '@discordjs/collection': 2.1.1
       '@discordjs/rest': 2.6.3
@@ -11448,23 +11576,23 @@ snapshots:
     dependencies:
       '@chevrotain/types': 13.2.0
 
-  '@microsoft/teams.api@2.0.16':
+  '@microsoft/teams.api@2.0.16(debug@4.4.3)':
     dependencies:
       '@microsoft/teams.cards': 2.0.16
-      '@microsoft/teams.common': 2.0.16
+      '@microsoft/teams.common': 2.0.16(debug@4.4.3)
       jwt-decode: 4.0.0
       qs: 6.15.3
     transitivePeerDependencies:
       - debug
       - supports-color
 
-  '@microsoft/teams.apps@2.0.16':
+  '@microsoft/teams.apps@2.0.16(debug@4.4.3)':
     dependencies:
       '@azure/msal-node': 5.6.0
-      '@microsoft/teams.api': 2.0.16
-      '@microsoft/teams.common': 2.0.16
-      '@microsoft/teams.graph': 2.0.16
-      axios: 1.20.0
+      '@microsoft/teams.api': 2.0.16(debug@4.4.3)
+      '@microsoft/teams.common': 2.0.16(debug@4.4.3)
+      '@microsoft/teams.graph': 2.0.16(debug@4.4.3)
+      axios: 1.20.0(debug@4.4.3)
       cors: 2.8.6
       express: 5.2.1
       jsonwebtoken: 9.0.3
@@ -11476,24 +11604,24 @@ snapshots:
 
   '@microsoft/teams.cards@2.0.16': {}
 
-  '@microsoft/teams.common@2.0.16':
+  '@microsoft/teams.common@2.0.16(debug@4.4.3)':
     dependencies:
-      axios: 1.20.0
+      axios: 1.20.0(debug@4.4.3)
     transitivePeerDependencies:
       - debug
       - supports-color
 
   '@microsoft/teams.graph-endpoints@2.0.16': {}
 
-  '@microsoft/teams.graph@2.0.16':
+  '@microsoft/teams.graph@2.0.16(debug@4.4.3)':
     dependencies:
-      '@microsoft/teams.common': 2.0.16
+      '@microsoft/teams.common': 2.0.16(debug@4.4.3)
       qs: 6.16.0
     transitivePeerDependencies:
       - debug
       - supports-color
 
-  '@modelcontextprotocol/sdk@1.31.0(zod@4.4.3)':
+  '@modelcontextprotocol/sdk@1.31.0':
     dependencies:
       '@hono/node-server': 2.1.3(hono@4.13.13)
       ajv: 8.20.0
@@ -11512,28 +11640,6 @@ snapshots:
       raw-body: 3.0.2
       zod: 4.4.3
       zod-to-json-schema: 3.25.2(zod@4.4.3)
-    transitivePeerDependencies:
-      - supports-color
-
-  '@modelcontextprotocol/sdk@1.31.0(zod@4.6.5)':
-    dependencies:
-      '@hono/node-server': 2.1.3(hono@4.13.13)
-      ajv: 8.20.0
-      ajv-formats: 3.0.1(ajv@8.20.0)
-      content-type: 1.0.5
-      cors: 2.8.6
-      cross-spawn: 7.0.6
-      eventsource: 3.0.7
-      eventsource-parser: 3.1.1
-      express: 5.2.1
-      express-rate-limit: 8.7.1(express@5.2.1)
-      hono: 4.13.13
-      jose: 6.2.12
-      json-schema-typed: 8.0.2
-      pkce-challenge: 5.0.1
-      raw-body: 3.0.2
-      zod: 4.6.5
-      zod-to-json-schema: 3.25.2(zod@4.6.5)
     transitivePeerDependencies:
       - supports-color
 
@@ -13098,10 +13204,10 @@ snapshots:
     dependencies:
       '@types/node': 24.13.3
 
-  '@slack/socket-mode@2.0.7':
+  '@slack/socket-mode@2.0.7(debug@4.4.3)':
     dependencies:
       '@slack/logger': 4.0.1
-      '@slack/web-api': 7.19.0
+      '@slack/web-api': 7.19.0(debug@4.4.3)
       '@types/node': 24.13.3
       '@types/ws': 8.18.2
       eventemitter3: 5.0.4
@@ -13114,13 +13220,13 @@ snapshots:
 
   '@slack/types@2.22.0': {}
 
-  '@slack/web-api@7.19.0':
+  '@slack/web-api@7.19.0(debug@4.4.3)':
     dependencies:
       '@slack/logger': 4.0.1
       '@slack/types': 2.22.0
       '@types/node': 24.13.3
       '@types/retry': 0.12.0
-      axios: 1.20.0
+      axios: 1.20.0(debug@4.4.3)
       eventemitter3: 5.0.4
       form-data: 4.0.6
       is-electron: 2.2.2
@@ -13787,14 +13893,14 @@ snapshots:
     dependencies:
       execa: 5.1.1
 
-  '@vercel/connect@2.3.3(@chat-adapter/slack@4.39.0(patch_hash=226jj24akljccsfbw7bcxujz4u)(ai@7.0.130(zod@4.4.3))(zod@4.4.3))(@modelcontextprotocol/sdk@1.31.0(zod@4.4.3))(ai@7.0.130(zod@4.4.3))(better-auth@1.7.2(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda)))(pg@8.18.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))))':
+  '@vercel/connect@2.3.3(@chat-adapter/slack@4.39.0(patch_hash=b3f7862ad641a4614f1c47c81577a9808d108707c88d0bfbc40c100bb678750d)(ai@7.0.130(zod@4.4.3))(debug@4.4.3)(zod@4.4.3))(@modelcontextprotocol/sdk@1.31.0)(ai@7.0.130(zod@4.4.3))(better-auth@1.7.2(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc)))(pg@8.18.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))))':
     dependencies:
       '@vercel/oidc': 3.8.9
     optionalDependencies:
-      '@chat-adapter/slack': 4.39.0(patch_hash=226jj24akljccsfbw7bcxujz4u)(ai@7.0.130(zod@4.4.3))(zod@4.4.3)
-      '@modelcontextprotocol/sdk': 1.31.0(zod@4.4.3)
+      '@chat-adapter/slack': 4.39.0(patch_hash=b3f7862ad641a4614f1c47c81577a9808d108707c88d0bfbc40c100bb678750d)(ai@7.0.130(zod@4.4.3))(debug@4.4.3)(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.31.0
       ai: 7.0.130(zod@4.4.3)
-      better-auth: 1.7.2(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda)))(pg@8.18.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))
+      better-auth: 1.7.2(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc)))(pg@8.18.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))
 
   '@vercel/oidc@3.2.0': {}
 
@@ -13888,7 +13994,7 @@ snapshots:
 
   acorn@8.18.0: {}
 
-  acpx@0.12.0(patch_hash=6st5fzvttegjv64llnfegwwpca):
+  acpx@0.12.0(patch_hash=76be3d72d2552dfe0a486156e7f1c07dc59dab9d380336a233cb14459791dcb0):
     dependencies:
       '@agentclientprotocol/sdk': 1.2.1(zod@4.4.3)
       commander: 15.0.0
@@ -13900,7 +14006,7 @@ snapshots:
       - bare-buffer
       - react-native-b4a
 
-  acpx@0.13.1(patch_hash=xh3fclih3ztrbsibpfnxdcx7pe):
+  acpx@0.13.1(patch_hash=1e7dae8c83bf8620f53f2bea13c175eeff95e7e955783f6f529bb1dcbdcdb6d2):
     dependencies:
       '@agentclientprotocol/sdk': 1.4.0(zod@4.4.3)
       commander: 15.0.0
@@ -14016,9 +14122,9 @@ snapshots:
 
   axe-core@4.13.0: {}
 
-  axios@1.20.0:
+  axios@1.20.0(debug@4.4.3):
     dependencies:
-      follow-redirects: 1.16.0
+      follow-redirects: 1.16.0(debug@4.4.3)
       form-data: 4.0.6
       https-proxy-agent: 5.0.1
       proxy-from-env: 2.1.0
@@ -14071,10 +14177,10 @@ snapshots:
 
   before-after-hook@4.0.0: {}
 
-  better-auth@1.7.2(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda)))(pg@8.18.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))):
+  better-auth@1.7.2(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc)))(pg@8.18.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))):
     dependencies:
       '@better-auth/core': 1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.3)
-      '@better-auth/drizzle-adapter': 1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.3))(@better-auth/utils@0.4.2)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda)))
+      '@better-auth/drizzle-adapter': 1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.3))(@better-auth/utils@0.4.2)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc)))
       '@better-auth/kysely-adapter': 1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.3))(@better-auth/utils@0.4.2)(kysely@0.29.5)
       '@better-auth/memory-adapter': 1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.3))(@better-auth/utils@0.4.2)
       '@better-auth/mongo-adapter': 1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.3))(@better-auth/utils@0.4.2)
@@ -14092,7 +14198,7 @@ snapshots:
       zod: 4.4.3
     optionalDependencies:
       drizzle-kit: 0.31.10
-      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda))
+      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc))
       pg: 8.18.0
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
@@ -14637,7 +14743,7 @@ snapshots:
       '@discordjs/formatters': 0.6.2
       '@discordjs/rest': 2.6.3
       '@discordjs/util': 1.2.0
-      '@discordjs/ws': 1.2.3(patch_hash=vbylpnnxt5av2zdnuqmf6hjyjy)
+      '@discordjs/ws': 1.2.3(patch_hash=001e315a33852c603d3c5ec8ced17ebbd9eb28d78b967aff6dcec307014b7652)
       '@sapphire/snowflake': 3.5.5
       discord-api-types: 0.38.55
       fast-deep-equal: 3.1.3
@@ -14683,12 +14789,12 @@ snapshots:
       esbuild: 0.25.12
       tsx: 4.23.15
 
-  drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda)):
+  drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(kysely@0.29.5)(pg@8.18.0)(postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc)):
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
       kysely: 0.29.5
       pg: 8.18.0
-      postgres: 3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda)
+      postgres: 3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc)
 
   dunder-proto@1.0.1:
     dependencies:
@@ -14706,7 +14812,7 @@ snapshots:
 
   elkjs@0.9.3: {}
 
-  embedded-postgres@18.1.0-beta.16(patch_hash=55uhvnotpqyiy37rn3pqpukhei):
+  embedded-postgres@18.1.0-beta.16(patch_hash=d8b1e087e95f559a6342fc15954f11af22d9dca43a7fcca5762b6459913b5800):
     dependencies:
       async-exit-hook: 2.0.1
       pg: 8.18.0
@@ -14991,7 +15097,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  follow-redirects@1.16.0: {}
+  follow-redirects@1.16.0(debug@4.4.3):
+    optionalDependencies:
+      debug: 4.4.3
 
   form-data@4.0.5:
     dependencies:
@@ -16571,7 +16679,7 @@ snapshots:
     dependencies:
       xtend: 4.0.2
 
-  postgres@3.4.9(patch_hash=6q4cic6qawywsyeo2spgnjamda): {}
+  postgres@3.4.9(patch_hash=c9337ab6c34c3389ab1fc92f118acbc14bf692ffcf7996061967448891879bcc): {}
 
   powershell-utils@0.1.0: {}
 
@@ -17801,10 +17909,6 @@ snapshots:
   zod-to-json-schema@3.25.2(zod@4.4.3):
     dependencies:
       zod: 4.4.3
-
-  zod-to-json-schema@3.25.2(zod@4.6.5):
-    dependencies:
-      zod: 4.6.5
 
   zod@3.25.76: {}
 

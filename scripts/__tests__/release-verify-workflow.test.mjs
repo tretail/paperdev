@@ -360,7 +360,7 @@ test("canary smoke consumes its publisher's source-bound lockfile before frozen 
   for (const job of [publish, smoke]) {
     assert.match(job, /name: Checkout repository\n\s+uses: actions\/checkout@[^\n]+\n\s+with:\n\s+ref: \$\{\{ github\.sha \}\}/);
     assert.match(job, /name: canary-smoke-lockfile-\$\{\{ github\.sha \}\}/);
-    assert.match(job, /version: 9\.15\.4/);
+    assert.match(job, /version: 12\.16\.1/);
   }
   assert.match(publish, /name: Save canary smoke lockfile\n\s+uses: actions\/upload-artifact@[0-9a-f]{40} # v4\n\s+with:\n\s+name: canary-smoke-lockfile-\$\{\{ github\.sha \}\}\n\s+path: pnpm-lock\.yaml\n\s+if-no-files-found: error\n\s+overwrite: true\n\s+retention-days: 14/);
   assert.ok(publish.indexOf("name: Install dependencies") < publish.indexOf("name: Save canary smoke lockfile"));
