@@ -537,6 +537,12 @@ const NON_RETRYABLE_CONTINUATION_ERROR_CODES = new Set<string>([
   "budget_exhausted",
   "issue_paused",
   "issue_dependencies_blocked",
+  // Plan approval gate and Claude permission/auth guards: retrying cannot
+  // succeed until a human approves the plan or fixes the configuration.
+  "plan_approval_required",
+  "read_only_run_modified_workspace",
+  "claude_subscription_auth_required",
+  "claude_permission_profile_conflict",
   // This is the fail-closed fallback for exceptions raised before an adapter
   // process starts. Known transient preflight failures use dedicated bounded
   // retry paths instead of generic issue continuation recovery.

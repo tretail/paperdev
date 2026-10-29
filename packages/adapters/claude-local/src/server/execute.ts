@@ -950,7 +950,13 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       ? ""
       : renderTemplate(promptTemplate, templateData);
     const sessionHandoffNote = asString(context.paperclipSessionHandoffMarkdown, "").trim();
+    const planGateDirective = permissionProfile.kind === "read_only" && permissionProfile.reason === "plan_approval_gate"
+      ? "Plan approval gate: this task's current plan is not approved by a human, so this run is read-only. " +
+        "Investigate and write or revise the issue's `plan` document, then request confirmation of the latest plan revision. " +
+        "Do not implement; file edits and non-read-only commands are denied."
+      : "";
     const prompt = joinPromptSections([
+      planGateDirective,
       instructionsPathDirective,
       renderedBootstrapPrompt,
       selectInitialCommunicationGuidance(context, { resumedSession: Boolean(resumeSessionId) }),

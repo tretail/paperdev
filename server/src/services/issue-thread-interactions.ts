@@ -30,6 +30,7 @@ import {
   or,
   sql,
 } from "drizzle-orm";
+import { readPlanApprovalImplementer } from "./plan-approval-gate.js";
 import type { Db } from "@paperclipai/db";
 import {
   agents,
@@ -2346,6 +2347,19 @@ export function issueThreadInteractionService(
         acceptedPlanTarget?.issueId === issueContext.id &&
         acceptedPlanTarget.key === "plan" &&
         issueContext.workMode === "planning";
+      // Plan approval gate: a human's approval hands the task to the
+      // project's implementer. Agent acceptances never count as approval.
+      const gatedImplementerAgentId =
+        lockedCurrent.kind === "request_confirmation" &&
+        acceptedPlanTarget?.issueId === issueContext.id &&
+        acceptedPlanTarget.key === "plan" &&
+        args.actor.userId &&
+        !args.actor.agentId
+          ? await readPlanApprovalImplementer(tx as unknown as Db, {
+              companyId: issueContext.companyId,
+              issueId: issueContext.id,
+            })
+          : null;
       if (isNativeCompletionReview(lockedCurrent)) {
         const otherPending = await tx.select({ id: issueThreadInteractions.id })
           .from(issueThreadInteractions).where(and(
@@ -2379,6 +2393,29 @@ export function issueThreadInteractionService(
             assigneeAgentId: completedIssue.assigneeAgentId ?? null,
             assigneeUserId: completedIssue.assigneeUserId ?? null,
             status: completedIssue.status,
+          };
+        }
+      } else if (gatedImplementerAgentId) {
+        const handedOffIssue = await issueService(db).update(
+          args.issue.id,
+          {
+            status: issueContext.status === "blocked" ? "blocked" : "todo",
+            workMode: "standard",
+            assigneeAgentId: gatedImplementerAgentId,
+            assigneeUserId: null,
+            actorAgentId: null,
+            actorUserId: args.actor.userId ?? null,
+          },
+          tx,
+          postCommitActivityPublications,
+        );
+        if (handedOffIssue) {
+          continuationIssue = {
+            id: handedOffIssue.id,
+            assigneeAgentId: handedOffIssue.assigneeAgentId ?? null,
+            assigneeUserId: handedOffIssue.assigneeUserId ?? null,
+            status: handedOffIssue.status,
+            workMode: handedOffIssue.workMode,
           };
         }
       } else if (

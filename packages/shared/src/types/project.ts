@@ -6,6 +6,17 @@ import type {
 } from "./workspace-runtime.js";
 import type { AgentEnvConfig } from "./secrets.js";
 
+/**
+ * Opt-in plan approval gate for a project's tasks. When enabled, no
+ * implementation run may start on a task until a human accepts the current
+ * revision of its `plan` document.
+ */
+export interface ProjectPlanApprovalPolicy {
+  enabled: boolean;
+  /** Agent that receives a task after its plan is approved; null keeps the assignee. */
+  implementerAgentId?: string | null;
+}
+
 export interface ProjectGitAuthorization {
   grantId: string | null;
   authorizedByUserId: string | null;
@@ -141,6 +152,8 @@ export interface Project {
   pauseReason: PauseReason | null;
   pausedAt: Date | null;
   executionWorkspacePolicy: ProjectExecutionWorkspacePolicy | null;
+  /** Omitted by older servers/fixtures; treat omission as disabled. */
+  planApprovalPolicy?: ProjectPlanApprovalPolicy | null;
   workspaceProvider?: ProjectWorkspaceProviderConfiguration;
   codebase: ProjectCodebase;
   workspaces: ProjectWorkspace[];

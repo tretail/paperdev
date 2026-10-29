@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "plan_approval_policy" jsonb;

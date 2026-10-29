@@ -86,7 +86,7 @@ function registerModuleMocks() {
   }));
 }
 
-async function createApp() {
+async function createApp(overrides: { actor?: Record<string, unknown>; db?: Record<string, unknown> } = {}) {
   const [{ projectRoutes }, { errorHandler }] = await Promise.all([
     vi.importActual<typeof import("../routes/projects.js")>("../routes/projects.js"),
     vi.importActual<typeof import("../middleware/index.js")>("../middleware/index.js"),
@@ -94,7 +94,7 @@ async function createApp() {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    (req as any).actor = {
+    (req as any).actor = overrides.actor ?? {
       type: "board",
       userId: "board-user",
       companyIds: ["company-1"],
@@ -103,7 +103,10 @@ async function createApp() {
     };
     next();
   });
-  app.use("/api", projectRoutes({ transaction: async (effect: (tx: unknown) => unknown) => effect({}) } as any));
+  app.use("/api", projectRoutes({
+    transaction: async (effect: (tx: unknown) => unknown) => effect({}),
+    ...overrides.db,
+  } as any));
   app.use(errorHandler);
   return app;
 }
@@ -244,5 +247,47 @@ describe("project env routes", () => {
         },
       }),
     );
+  });
+
+  describe("plan approval policy", () => {
+    const implementerId = "22222222-2222-4222-8222-222222222222";
+    const selectReturning = (rows: unknown[]) => ({
+      select: () => ({ from: () => ({ where: () => ({ limit: async () => rows }) }) }),
+    });
+
+    it("rejects agent changes to the plan approval policy", async () => {
+      const app = await createApp({
+        actor: { type: "agent", agentId: "agent-1", companyId: "company-1", companyIds: ["company-1"], source: "agent_key" },
+      });
+      const res = await request(app)
+        .post("/api/companies/company-1/projects")
+        .send({ name: "Sneaky", planApprovalPolicy: { enabled: false } });
+      expect(res.status, JSON.stringify(res.body)).toBe(403);
+      expect(mockProjectService.create).not.toHaveBeenCalled();
+    });
+
+    it("lets the board enable the gate and logs the policy", async () => {
+      const policy = { enabled: true, implementerAgentId: implementerId };
+      mockProjectService.getById.mockResolvedValue(buildProject());
+      mockProjectService.update.mockResolvedValue(buildProject({ planApprovalPolicy: policy }));
+      const app = await createApp({ db: selectReturning([{ id: implementerId }]) });
+      const res = await request(app).patch("/api/projects/project-1").send({ planApprovalPolicy: policy });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      expect(mockProjectService.update).toHaveBeenCalledWith("project-1", expect.objectContaining({ planApprovalPolicy: policy }));
+      expect(mockLogActivity).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ details: expect.objectContaining({ planApprovalPolicy: policy }) }),
+      );
+    });
+
+    it("rejects an implementer from another company", async () => {
+      mockProjectService.getById.mockResolvedValue(buildProject());
+      const app = await createApp({ db: selectReturning([]) });
+      await request(app)
+        .patch("/api/projects/project-1")
+        .send({ planApprovalPolicy: { enabled: true, implementerAgentId: implementerId } })
+        .expect(422);
+      expect(mockProjectService.update).not.toHaveBeenCalled();
+    });
   });
 });

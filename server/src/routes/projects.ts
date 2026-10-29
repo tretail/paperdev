@@ -375,6 +375,24 @@ export function projectRoutes(db: Db) {
     res.json(summary);
   });
 
+  // The plan approval gate is human governance: agents must not enable,
+  // disable, or retarget it, and the implementer must belong to the company.
+  async function assertPlanApprovalPolicyMutationAllowed(
+    req: Request,
+    companyId: string,
+    policy: { enabled: boolean; implementerAgentId?: string | null } | null | undefined,
+  ) {
+    if (policy === undefined) return;
+    if (req.actor.type !== "board") throw forbidden("Only board users can change a project's plan approval policy");
+    if (!policy?.implementerAgentId) return;
+    const [implementer] = await db
+      .select({ id: agents.id })
+      .from(agents)
+      .where(and(eq(agents.id, policy.implementerAgentId), eq(agents.companyId, companyId)))
+      .limit(1);
+    if (!implementer) throw unprocessable("Plan approval implementer must be an agent in this company");
+  }
+
   router.post("/companies/:companyId/projects", validate(createProjectSchema), async (req, res) => {
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);
@@ -386,6 +404,7 @@ export function projectRoutes(db: Db) {
     const { workspace, repositoryIds, repositoryUrls, idempotencyKey, ...projectData } = req.body as CreateProjectPayload & { idempotencyKey?: string; repositoryUrls?: string[] };
     const receiptOnly = req.get("X-Paperclip-Receipt-Only") === "true";
     if (receiptOnly && !idempotencyKey) throw unprocessable("Project receipt recovery requires an idempotency key");
+    await assertPlanApprovalPolicyMutationAllowed(req, companyId, projectData.planApprovalPolicy);
     projectData.privacyOwnerUserId = req.actor.type === "board" ? req.actor.userId ?? null : req.actor.type === "agent" ? req.actor.onBehalfOfUserId ?? null : null;
     const runContext = req.actor.type === "agent" && req.actor.source === "agent_jwt" && req.actor.runId
       ? await projectToolContext(db, req.actor, true) : null;
@@ -504,6 +523,7 @@ export function projectRoutes(db: Db) {
     if (!existing) return;
     if (!(await assertProjectReadAllowed(req, res, existing))) return;
     const body = { ...req.body };
+    await assertPlanApprovalPolicyMutationAllowed(req, existing.companyId, body.planApprovalPolicy);
     if (body.visibility !== undefined) {
       if (!(await assertCanManageProjectPrivacy(req, res, existing))) return;
     }
@@ -549,6 +569,7 @@ export function projectRoutes(db: Db) {
       entityId: project.id,
       details: {
         changedKeys: Object.keys(req.body).sort(),
+        ...(body.planApprovalPolicy !== undefined ? { planApprovalPolicy: body.planApprovalPolicy } : {}),
         envKeys:
           body.env && typeof body.env === "object" && !Array.isArray(body.env)
             ? Object.keys(body.env as Record<string, unknown>).sort()

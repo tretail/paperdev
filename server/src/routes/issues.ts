@@ -54,6 +54,7 @@ import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray, isNull, notInArray, or, sql, type SQL } from "drizzle-orm";
+import { evaluatePlanApproval } from "../services/plan-approval-gate.js";
 import type { Db } from "@paperclipai/db";
 import type { ChatChannelService } from "../services/chat-channels.js";
 import {
@@ -10475,6 +10476,19 @@ export function issueRoutes(
       refreshPullRequests: req.query.refreshPullRequests === "true",
     });
     res.json(workProducts);
+  });
+
+  router.get("/issues/:id/plan-approval", async (req, res) => {
+    const id = req.params.id as string;
+    const issue = await getAccessibleResource(
+      req,
+      res,
+      getIssueById(req, id),
+      "Issue not found",
+    );
+    if (!issue) return;
+    if (!(await assertIssueReadAllowed(req, res, issue))) return;
+    res.json(await evaluatePlanApproval(db, { companyId: issue.companyId, issueId: issue.id }));
   });
 
   router.get("/issues/:id/external-objects", async (req, res) => {

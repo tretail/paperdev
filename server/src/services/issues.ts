@@ -66,6 +66,11 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
+import {
+  describePlanApprovalGap,
+  PLAN_APPROVAL_REQUIRED_ERROR_CODE,
+  planGateAllowsAgentCheckout,
+} from "./plan-approval-gate.js";
 import { unionAll } from "drizzle-orm/pg-core";
 import type { Db } from "@paperclipai/db";
 import {
@@ -12024,6 +12029,20 @@ export function issueService(db: Db) {
             "Fail Securely",
             "Secure Defaults",
           ],
+        });
+      }
+
+      const planGate = await planGateAllowsAgentCheckout(db, {
+        companyId: issueCompany.companyId,
+        issueId: id,
+        agentId,
+        checkoutRunId,
+      });
+      if (!planGate.allowed) {
+        throw conflict("Issue checkout requires an approved plan", {
+          code: PLAN_APPROVAL_REQUIRED_ERROR_CODE,
+          issueId: id,
+          reason: describePlanApprovalGap(planGate.evaluation),
         });
       }
 

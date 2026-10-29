@@ -21,6 +21,11 @@ const executionWorkspaceStrategySchema = z
   })
   .strict();
 
+export const projectPlanApprovalPolicySchema = z.object({
+  enabled: z.boolean(),
+  implementerAgentId: z.string().guid().nullable().optional(),
+}).strict();
+
 export const projectExecutionWorkspacePolicySchema = z
   .object({
     enabled: z.boolean(),
@@ -120,6 +125,7 @@ const projectFields = {
   icon: z.enum(PROJECT_ICON_NAMES).optional().nullable(),
   env: envConfigSchema.optional().nullable(),
   executionWorkspacePolicy: projectExecutionWorkspacePolicySchema.optional().nullable(),
+  planApprovalPolicy: projectPlanApprovalPolicySchema.optional().nullable(),
   archivedAt: z.string().datetime().optional().nullable(),
 };
 

@@ -95,6 +95,12 @@ import type { NativeExecutionInput, NativeSessionBackend } from "../../vendor/pa
 import type { PluginWorkerManager } from "../plugin-worker-manager.js";
 import type { RealizedExecutionWorkspace } from "../workspace-runtime.js";
 import type { reserveWarmNativeInstructionDirectory } from "../native-runtime/index.js";
+import {
+  decidePlanGateRun,
+  evaluatePlanApproval,
+  PLAN_APPROVAL_REQUIRED_ERROR_CODE,
+  planGateContextFor,
+} from "../plan-approval-gate.js";
 
 type Selection = HeartbeatRuntimeSelectionInput;
 type Selected = Extract<HeartbeatRuntimeSelectionResult, { selected: true }>;
@@ -502,8 +508,24 @@ export async function executeHeartbeatRuntime(db: Db, input: HeartbeatRuntimeExe
   const runGoalControlRequestId = readNonEmptyString(
     context.goalControlRequestId,
   );
+  // The plan approval gate is evaluated here, at dispatch, so retries,
+  // recovery, and resumed runs all observe the current plan approval state.
+  const planGateDecision = issueRef
+    ? decidePlanGateRun(await evaluatePlanApproval(db, { companyId: agent.companyId, issueId: issueRef.id }), agent)
+    : ({ kind: "ungated" } as const);
+  const planGateContext = issueRef ? planGateContextFor(issueRef.id, planGateDecision) : null;
   try {
-    if (nativeRuntimeResolution.kind === "native") {
+    if (planGateDecision.kind === "blocked") {
+      await onLog("stderr", `[paperclip] ${planGateDecision.reason}\n`);
+      adapterResult = {
+        exitCode: 1,
+        signal: null,
+        timedOut: false,
+        errorCode: PLAN_APPROVAL_REQUIRED_ERROR_CODE,
+        errorMessage: planGateDecision.reason,
+        resultJson: { executionRecovery: { kind: "bootstrap", providerWorkStarted: false } },
+      };
+    } else if (nativeRuntimeResolution.kind === "native") {
       if (!nativeExecution || !nativeRunnerInstanceId)
         throw new Error("native_runtime_selection_not_persisted");
       const expectedNativeMcpDigest =
@@ -744,6 +766,7 @@ export async function executeHeartbeatRuntime(db: Db, input: HeartbeatRuntimeExe
       // heartbeat run snapshot.
       const adapterContext: Record<string, unknown> = {
         ...context,
+        ...(planGateContext ? { paperclipPlanGate: planGateContext } : {}),
         ...(legacyQuestionResponse
           ? {
               [PAPERCLIP_WAKE_PAYLOAD_KEY]: {
