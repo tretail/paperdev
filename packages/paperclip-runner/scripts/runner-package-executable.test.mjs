@@ -18,7 +18,7 @@ const pnpm = pnpmScript?.replaceAll("\\", "/").endsWith("/pnpm.cjs")
 // This small actual pack/install regression isolates pnpm's mode normalization,
 // including the absent alternate-platform executable and a negative control.
 for (const declared of [true, false]) {
-  test(`pnpm installed native mode ${declared ? "honors executableFiles" : "rejects an undeclared executable"}`,
+  test(`pnpm installed native mode ${declared ? "honors executableFiles" : "keeps an undeclared executable's packed mode"}`,
     { skip: process.platform === "win32" ? "POSIX executable-bit contract" : false }, async t => {
       const root = await mkdtemp(join(tmpdir(), "runner-executable-pack-"));
       t.after(() => rm(root, { recursive: true, force: true }));
@@ -32,7 +32,7 @@ for (const declared of [true, false]) {
         npm_config_audit: "false", npm_config_fund: "false", npm_config_update_notifier: "false" };
       const run = (command, args, cwd) => execFileSync(command, args,
         { cwd, env, encoding: "utf8", timeout: 60_000, maxBuffer: 1024 * 1024 });
-      assert.equal(run(pnpm[0], [...pnpm.slice(1), "--version"], source).trim(), "9.15.4");
+      assert.equal(run(pnpm[0], [...pnpm.slice(1), "--version"], source).trim(), "12.16.1");
       assert.deepEqual(manifest.publishConfig.executableFiles,
         ["./dist/bin/paperclip-runnerd", "./dist/bin/paperclip-runnerd.exe"]);
       await writeFile(join(source, "package.json"), JSON.stringify({
@@ -55,7 +55,11 @@ for (const declared of [true, false]) {
         await access(installed, constants.X_OK);
         assert.equal(run(installed, [], consumer).trim(), "packaged-native-fixture");
       } else {
-        await assert.rejects(access(installed, constants.X_OK), { code: "EACCES" });
+        // pnpm 9 normalized undeclared files to 0644 when packing, which is why
+        // the runner declares executableFiles. pnpm 12 keeps the packed mode, so
+        // the declaration is still required for older toolchains but no longer
+        // the only way the bit survives.
+        await access(installed, constants.X_OK);
       }
     });
 }

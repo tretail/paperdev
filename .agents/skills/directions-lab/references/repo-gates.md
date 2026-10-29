@@ -181,7 +181,7 @@ pnpm run check:token-gates
 
 `package.json:47` chains `check-token-gates.mjs`, `sync-agent-palette-tokens.mjs --check` and
 `sync-cliplab-character.mjs --check`. Use `pnpm run`; the bare shorthand has failed with
-`Command not found` under pnpm 9.15.4 in a worktree. Expect four gates `CLEAN`.
+`Command not found` in a worktree. Expect four gates `CLEAN`.
 
 ## 4. PR rules from CONTRIBUTING and the template
 

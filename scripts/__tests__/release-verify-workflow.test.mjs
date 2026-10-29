@@ -383,12 +383,12 @@ for (const drift of ["patch", "manifest"]) {
     assert.equal(pack.status, 0, pack.stderr);
     const manifest = {
       name: "canary-smoke-fixture", private: true,
-      packageManager: "pnpm@9.15.4",
+      packageManager: "pnpm@12.16.1",
       dependencies: { "smoke-fixture-dependency": "file:smoke-fixture-dependency-1.0.0.tgz" },
-      pnpm: { patchedDependencies: { "smoke-fixture-dependency@1.0.0": "fixture.patch" } },
     };
     writeFileSync(path.join(root, "package.json"), JSON.stringify(manifest));
-    writeFileSync(path.join(root, "pnpm-workspace.yaml"), "packages: []\n");
+    writeFileSync(path.join(root, "pnpm-workspace.yaml"),
+      "packages: []\npatchedDependencies:\n  smoke-fixture-dependency@1.0.0: fixture.patch\n");
     const patch = (value) => writeFileSync(path.join(root, "fixture.patch"), [
       "diff --git a/index.js b/index.js", "index 1111111..2222222 100644",
       "--- a/index.js", "+++ b/index.js", "@@ -1 +1 @@",
