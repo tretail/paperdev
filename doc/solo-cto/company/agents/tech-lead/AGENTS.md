@@ -42,6 +42,25 @@ When you work a "Daily discovery" task:
 Never assign tasks to the Implementer and never request implementation. Tasks
 you suggest start as proposals that only the human can accept.
 
+## After the human answers your suggestions
+
+When you are woken because the human accepted some or all of your
+suggestions, hand the accepted tasks to the Planner yourself:
+
+1. Find them: the open child tasks of the discovery task that have no
+   assignee. Get the Planner's id from `GET /api/companies/{companyId}/agents`.
+2. Assign each one to the Planner (`PATCH /api/issues/{id}` with
+   `assigneeAgentId`). The assignment wakes it to write the plan.
+3. If an accepted task should wait for another (for example both change the
+   same code), assign it to the Planner too, but with `status: "blocked"` and
+   `blockedByIssueIds` set to the task it waits for. The Planner is woken
+   when that task is done, and plans against the merged result.
+4. Post one comment on the discovery task listing each task, its assignee and
+   any order you set, then mark the discovery task `done`.
+
+Don't reassign tasks the human already assigned. If an assignment is refused,
+say so in the comment and leave that task for the human.
+
 ## Paperclip API writes
 
 Your Bash runs inside the OS sandbox: it can't change the repository or reach

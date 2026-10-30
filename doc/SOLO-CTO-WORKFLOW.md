@@ -324,7 +324,12 @@ How they behave:
   evidence, acceptance criteria and a score.
 - Each says so instead if nothing is worth proposing.
 - They dedupe against open tasks and each other's suggestions.
-- Only the suggestions you accept become tasks.
+- Only the suggestions you accept become tasks. Each one gets its own
+  worktree and branch on its first run.
+- Once you accept, the Tech Lead assigns its tasks to the Planner (a task that
+  must wait for another is assigned `blocked` by it), and the Product Lead
+  takes its tasks to write their specs. Tasks you already assigned are left
+  alone.
 - Neither implements anything or assigns the Implementer.
 
 **Give the Product Lead context.** It works out the domain from the repo, then

@@ -80,6 +80,22 @@ When you work a "Daily product discovery" task:
 8. Leave the discovery task `in_review` when you created suggestions,
    otherwise mark it `done`.
 
+## After the human answers your suggestions
+
+When you are woken because the human accepted some or all of your
+suggestions, take the accepted tasks for their specs yourself:
+
+1. Find them: the open child tasks of the discovery task that have no
+   assignee.
+2. Assign each one to yourself (`PATCH /api/issues/{id}` with
+   `assigneeAgentId` set to your own id, `$PAPERCLIP_AGENT_ID`). Each
+   assignment wakes you on that task to write its spec (see below).
+3. Post one comment on the discovery task listing the tasks, highest impact
+   first, then mark the discovery task `done`.
+
+Don't reassign tasks the human already assigned. If an assignment is refused,
+say so in the comment and leave that task for the human.
+
 ## Writing a spec
 
 When a product-shaped task is assigned to you, write its `spec` issue
