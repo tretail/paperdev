@@ -239,6 +239,21 @@ function claudeResultIndicatesAuthFailure(parsed: Record<string, unknown>): bool
   return extractClaudeErrorMessages(parsed).length > 0;
 }
 
+// Report whether a stdout line is a stream-json event other than the terminal
+// result. Those events carry model text and tool output (file contents, command
+// output, skill text), so their words are not the CLI's own login prompt.
+function isClaudeNonResultStreamEvent(line: string): boolean {
+  if (!line.startsWith("{")) return false;
+  try {
+    const event = JSON.parse(line) as unknown;
+    if (typeof event !== "object" || event === null || Array.isArray(event)) return false;
+    const type = (event as Record<string, unknown>).type;
+    return typeof type === "string" && type !== "result";
+  } catch {
+    return false;
+  }
+}
+
 export function detectClaudeLoginRequired(input: {
   parsed: Record<string, unknown> | null;
   stdout: string;
@@ -247,15 +262,21 @@ export function detectClaudeLoginRequired(input: {
   const parsed = input.parsed ?? null;
   const resultText = asString(parsed?.result, "").trim();
 
-  // The legacy login-prompt markers keep their broad scope. They match against
-  // every output line, which includes the parsed result, the parsed errors, and
-  // the raw stdout and stderr.
+  // A healthy parsed terminal result means the CLI was logged in, whatever the
+  // run printed. Otherwise a successful run whose tool output says
+  // "unauthorized" or "Proxy Authentication Required" would be sealed as
+  // login required.
+  const healthyResult = parsed !== null && !claudeResultIndicatesAuthFailure(parsed);
+
+  // The legacy login-prompt markers match against the parsed result, the parsed
+  // errors, stderr, and the raw stdout lines that are not stream-json model or
+  // tool events.
   const promptLines = [resultText, ...extractClaudeErrorMessages(parsed ?? {}), input.stdout, input.stderr]
     .join("\n")
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter(Boolean);
-  const loginPrompt = promptLines.some((line) => CLAUDE_LOGIN_PROMPT_RE.test(line));
+    .filter((line) => line && !isClaudeNonResultStreamEvent(line));
+  const loginPrompt = !healthyResult && promptLines.some((line) => CLAUDE_LOGIN_PROMPT_RE.test(line));
 
   // The token-failure markers match only against the parsed terminal fields of
   // a failed run. The raw stdout is untrusted, so a model that prints a token

@@ -134,6 +134,48 @@ describe("detectClaudeLoginRequired", () => {
     expect(isClaudeTransientUpstreamError(input)).toBe(true);
   });
 
+  it("does not classify a successful run whose tool output repeats a login prompt phrase", () => {
+    // A tool result (here, skill text the agent read, then a Gradle proxy 407)
+    // lands in the raw stdout. The parsed result is a success, so the run is
+    // logged in.
+    const parsed = { is_error: false, subtype: "success", result: "Checks T0 to T4 pass." };
+    expect(
+      detectClaudeLoginRequired({
+        parsed,
+        stdout: [
+          '{"type":"user","message":{"content":[{"type":"tool_result","content":"The server rejects unknown or unauthorized recipients."}]}}',
+          "Proxy Authentication Required",
+        ].join("\n"),
+        stderr: "",
+      }).requiresLogin,
+    ).toBe(false);
+  });
+
+  it("ignores login prompt phrases inside stream-json tool events of a failed run", () => {
+    // The run fails for another reason. The phrase is only in a tool result, not
+    // in the CLI's own output, so it is not a login prompt.
+    const parsed = { is_error: true, subtype: "error_max_turns", result: "" };
+    expect(
+      detectClaudeLoginRequired({
+        parsed,
+        stdout:
+          '{"type":"user","message":{"content":[{"type":"tool_result","content":"HTTP 401 Unauthorized"}]}}',
+        stderr: "",
+      }).requiresLogin,
+    ).toBe(false);
+  });
+
+  it("still classifies the CLI's not-logged-in result as login required", () => {
+    const parsed = { is_error: true, subtype: "success", result: "Not logged in · Please run /login" };
+    expect(
+      detectClaudeLoginRequired({
+        parsed,
+        stdout: '{"type":"result","subtype":"success","is_error":true,"result":"Not logged in · Please run /login"}',
+        stderr: "",
+      }).requiresLogin,
+    ).toBe(true);
+  });
+
   it("does not treat a bare token phrase in raw stdout with no parsed result as login required", () => {
     // Untrusted stdout alone must not satisfy a token-failure marker. Only the
     // parsed terminal result fields of a failed run can trip the token markers.
