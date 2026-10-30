@@ -14,6 +14,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StatusGlyph } from "@/components/StatusGlyph";
+import { IN_REVIEW_STATUS_LABEL } from "@/lib/issue-status-label";
 import { ProjectTile } from "@/components/ProjectTile";
 import { useFlyoutAppearance } from "@/components/ui/flyout-appearance";
 
@@ -128,8 +129,9 @@ function QuicklookSeparator({ className }: { className?: string }) {
   );
 }
 
-/** "in_review" -> "In review". The card states the status as a word, not a chip. */
+/** "in_progress" -> "In progress". The card states the status as a word, not a chip. */
 function statusLabel(status: string): string {
+  if (status === "in_review") return IN_REVIEW_STATUS_LABEL;
   const words = status.replace(/_/g, " ");
   return words.charAt(0).toUpperCase() + words.slice(1);
 }

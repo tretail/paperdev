@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ListFilter, Layers, ChevronDown, ChevronRight, User, Settings } from "lucide-react";
 import { timeAgo } from "../lib/timeAgo";
+import { IN_REVIEW_STATUS_LABEL } from "../lib/issue-status-label";
 
 /* ------------------------------------------------------------------ */
 /*  Event Tier Classification                                          */
@@ -115,7 +116,7 @@ type GroupMode = "flat" | "by-task";
 const FILTER_OPTIONS: Array<{ value: FilterValue; label: string }> = [
   { value: "all", label: "All" },
   { value: "in-progress", label: "In Progress" },
-  { value: "for-review", label: "In Review" },
+  { value: "for-review", label: IN_REVIEW_STATUS_LABEL },
   { value: "completed", label: "Done" },
 ];
 

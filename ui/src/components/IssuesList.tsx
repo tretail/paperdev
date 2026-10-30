@@ -100,6 +100,7 @@ import {
   type TaskCollectionPreferenceLocation,
 } from "../lib/task-collection-preferences";
 import { taskDateGroup, taskDateGroupSeparator, type TaskDateGroup } from "../lib/task-date-groups";
+import { IN_REVIEW_STATUS_LABEL } from "../lib/issue-status-label";
 import { deriveOriginatingActor, ISSUE_STATUSES, type Issue, type IssueStatus, type Project } from "@paperclipai/shared";
 import { Badge } from "@/components/ui/badge";
 const ISSUE_SEARCH_DEBOUNCE_MS = 250;
@@ -141,7 +142,7 @@ const issueStatusLabels: Record<IssueStatus, string> = {
   backlog: "Backlog",
   todo: "Todo",
   in_progress: "In progress",
-  in_review: "In review",
+  in_review: IN_REVIEW_STATUS_LABEL,
   done: "Done",
   blocked: "Blocked",
   cancelled: "Cancelled",

@@ -1,4 +1,5 @@
 import type { DashboardRunActivityDay, HeartbeatRun } from "@paperclipai/shared";
+import { IN_REVIEW_STATUS_LABEL } from "../lib/issue-status-label";
 
 /* ---- Utilities ---- */
 
@@ -239,7 +240,7 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   todo: "To Do",
   in_progress: "In Progress",
-  in_review: "In Review",
+  in_review: IN_REVIEW_STATUS_LABEL,
   done: "Done",
   blocked: "Blocked",
   cancelled: "Cancelled",

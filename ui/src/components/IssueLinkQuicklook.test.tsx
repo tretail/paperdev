@@ -254,13 +254,13 @@ describe("IssueLinkQuicklook", () => {
     const card = openCard(renderQuicklook({ status: "in_review" }));
 
     const glyph = card?.querySelector('[role="img"]');
-    expect(glyph?.getAttribute("aria-label")).toBe("In review");
+    expect(glyph?.getAttribute("aria-label")).toBe("Waiting");
 
     // The status must reach a screen reader but occupy no visible text. Drop
     // the glyph (whose <title> counts toward textContent) and the word is gone.
     const withoutGlyph = card?.cloneNode(true) as HTMLElement;
     withoutGlyph.querySelector('[role="img"]')?.remove();
-    expect(withoutGlyph.textContent).not.toContain("In review");
+    expect(withoutGlyph.textContent).not.toContain("Waiting");
     expect(withoutGlyph.textContent).not.toContain("in_review");
   });
 
