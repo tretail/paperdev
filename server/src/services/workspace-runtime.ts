@@ -271,6 +271,7 @@ const runtimeServicesByReuseKey = new Map<string, string>();
 const runtimeServiceLeasesByRun = new Map<string, string[]>();
 const runtimeProvisionByWorkspace = new Map<string, Promise<void>>();
 const runtimeControlStartByOwner = new Map<string, Promise<void>>();
+const gitWorktreeRealizationByRepo = new Map<string, Promise<void>>();
 const runtimeReplacementClaimsByReuseKey = new Map<string, number>();
 const quarantinedRuntimeExposurePorts = new Set<number>();
 /**
@@ -3320,7 +3321,25 @@ async function resolveGitRepoRootForWorkspaceCleanup(
   return path.dirname(resolvedGitDir);
 }
 
-export async function realizeExecutionWorkspace(input: {
+/**
+ * Realize one git worktree per repository at a time. `git worktree add -b`
+ * writes the new branch's upstream to the shared `.git/config` and base-ref
+ * fetches update shared refs, so overlapping realizations fail on git's lock
+ * files ("could not lock config file"). The turn includes the host provision
+ * command; other repositories and non-git workspaces don't wait.
+ */
+export async function realizeExecutionWorkspace(
+  input: Parameters<typeof realizeExecutionWorkspaceUnlocked>[0],
+): Promise<RealizedExecutionWorkspace> {
+  const strategyType = asString(parseObject(input.config.workspaceStrategy).type, "project_primary");
+  const repoRoot = strategyType === "git_worktree"
+    ? await resolveGitOwnerRepoRoot(input.base.baseCwd).catch(() => null)
+    : null;
+  if (!repoRoot) return realizeExecutionWorkspaceUnlocked(input);
+  return withKeyedMutex(gitWorktreeRealizationByRepo, repoRoot, () => realizeExecutionWorkspaceUnlocked(input));
+}
+
+async function realizeExecutionWorkspaceUnlocked(input: {
   db?: Db | null;
   base: ExecutionWorkspaceInput;
   config: Record<string, unknown>;
@@ -7664,21 +7683,25 @@ async function ensureRuntimeServicesForRunInvocation(
   return refs;
 }
 
-async function withRuntimeStartMutex<T>(ownerKey: string, start: () => Promise<T>): Promise<T> {
-  const previous = runtimeControlStartByOwner.get(ownerKey) ?? Promise.resolve();
+async function withKeyedMutex<T>(locks: Map<string, Promise<void>>, key: string, run: () => Promise<T>): Promise<T> {
+  const previous = locks.get(key) ?? Promise.resolve();
   let release!: () => void;
   const current = new Promise<void>((resolve) => {
     release = resolve;
   });
   const queued = previous.then(() => current);
-  runtimeControlStartByOwner.set(ownerKey, queued);
+  locks.set(key, queued);
   await previous;
   try {
-    return await start();
+    return await run();
   } finally {
     release();
-    if (runtimeControlStartByOwner.get(ownerKey) === queued) runtimeControlStartByOwner.delete(ownerKey);
+    if (locks.get(key) === queued) locks.delete(key);
   }
+}
+
+async function withRuntimeStartMutex<T>(ownerKey: string, start: () => Promise<T>): Promise<T> {
+  return withKeyedMutex(runtimeControlStartByOwner, ownerKey, start);
 }
 
 function resolveRuntimeStartMutexPlan(input: {

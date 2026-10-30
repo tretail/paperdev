@@ -9749,6 +9749,47 @@ describe("workspace realization request additionalSources", () => {
   });
 });
 
+describe("realizeExecutionWorkspace concurrency", () => {
+  it("creates worktrees for concurrent tasks in one repository", async () => {
+    const sourceRepo = await createTempRepo();
+    const remoteDir = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-worktree-remote-"));
+    const cloneRoot = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-worktree-clone-"));
+    try {
+      const remotePath = path.join(remoteDir, "paperclip.git");
+      await execFileAsync("git", ["clone", "--bare", sourceRepo, remotePath]);
+      const repoRoot = path.join(cloneRoot, "paperclip");
+      await execFileAsync("git", ["clone", remotePath, repoRoot]);
+
+      // Each `worktree add -b <branch> origin/main` writes the branch's upstream
+      // to the shared .git/config; adds that overlap fail on its lock.
+      const results = await Promise.allSettled(["PAP-1", "PAP-2", "PAP-3", "PAP-4"].map((identifier) =>
+        realizeExecutionWorkspace({
+          base: {
+            baseCwd: repoRoot,
+            source: "project_primary",
+            projectId: "project-1",
+            workspaceId: "workspace-1",
+            repoUrl: null,
+            repoRef: null,
+          },
+          config: { workspaceStrategy: { type: "git_worktree", branchTemplate: "{{issue.identifier}}" } },
+          issue: { id: `issue-${identifier}`, identifier, title: "Concurrent task" },
+          agent: { id: "agent-1", name: "Planner", companyId: "company-1" },
+        })));
+
+      expect(results.flatMap((result) => result.status === "rejected" ? [String(result.reason)] : [])).toEqual([]);
+      const workspaces = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+      expect(workspaces.map((workspace) => workspace.branchName)).toEqual(["PAP-1", "PAP-2", "PAP-3", "PAP-4"]);
+      for (const workspace of workspaces) {
+        expect(workspace.created).toBe(true);
+        expect(await readGit(workspace.cwd, ["rev-parse", "--abbrev-ref", "HEAD"])).toBe(workspace.branchName);
+      }
+    } finally {
+      await Promise.all([sourceRepo, remoteDir, cloneRoot].map((dir) => fs.rm(dir, { recursive: true, force: true })));
+    }
+  });
+});
+
 describe("realizeExecutionWorkspace with an exact existing branch", () => {
   function realizeExistingBranch(
     repoRoot: string,
