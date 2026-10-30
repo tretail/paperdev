@@ -1,0 +1,30 @@
+// Paperclip: route Gradle through the Claude Code sandbox proxy.
+//
+// Copy to <GRADLE_USER_HOME>/init.d/ for each company whose Implementer runs
+// Gradle. Java ignores HTTPS_PROXY, and the sandbox proxy URL carries a
+// per-session credential (http://<user>:<password>@127.0.0.1:<port>), so it
+// can't be set in JAVA_TOOL_OPTIONS: the JVM prints that variable on every
+// start. This script reads it at build time instead and prints nothing.
+// Outside the sandbox (no HTTPS_PROXY) it clears what an earlier build set.
+
+def proxyKeys = ["proxyHost", "proxyPort", "proxyUser", "proxyPassword"]
+def proxyUrl = System.getenv("HTTPS_PROXY") ?: System.getenv("https_proxy")
+
+["http", "https"].each { scheme ->
+    proxyKeys.each { key -> System.clearProperty("${scheme}.${key}") }
+}
+System.clearProperty("http.nonProxyHosts")
+
+if (proxyUrl) {
+    def uri = new URI(proxyUrl)
+    def credentials = uri.rawUserInfo?.split(":", 2)?.collect { URLDecoder.decode(it, "UTF-8") }
+    ["http", "https"].each { scheme ->
+        System.setProperty("${scheme}.proxyHost", uri.host)
+        System.setProperty("${scheme}.proxyPort", String.valueOf(uri.port))
+        if (credentials) {
+            System.setProperty("${scheme}.proxyUser", credentials[0])
+            System.setProperty("${scheme}.proxyPassword", credentials.size() > 1 ? credentials[1] : "")
+        }
+    }
+    System.setProperty("http.nonProxyHosts", "localhost|127.0.0.1|[::1]")
+}

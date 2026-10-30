@@ -1,3 +1,37 @@
+## This fork: solo-CTO autopilot
+
+This fork of [Paperclip](https://github.com/paperclipai/paperclip) runs one Paperclip company per real
+company. Each company gets four local Claude Code agents that use your Claude subscription:
+
+| Agent | What it does | Access |
+|---|---|---|
+| **Tech Lead** | Daily technical discovery (CI, DX, security, debt): proposes up to three tasks | Read-only |
+| **Product Lead** | Daily product discovery with web research; writes specs for you to approve | Read-only |
+| **Planner** | Investigates a task and writes its `plan` | Read-only |
+| **Implementer** | Implements the plan revision you approved, runs the tests, opens a PR | Writes, after your approval |
+
+What is enforced, not just requested:
+
+- No implementation run starts without your approval of the current plan revision.
+- Each run is sandboxed (Claude Code's macOS sandbox) to its company folder under `~/Workspaces`.
+  Other companies, your SSH keys, and your personal cloud and GitHub logins are unreadable. Files
+  such as a repo `.env` can be hidden too (`claudeSandbox.extraDenyRead`).
+- Cloud CLIs (`gh`, `aws`, `az`, `wrangler`, `supabase`) use per-company credentials only.
+
+Start it from a normal terminal (not inside a Claude Code session), then open http://localhost:3100:
+
+```sh
+tmux new-session -d -s paperdev -c ~/Workspaces/paperdev && tmux send-keys -t paperdev 'pnpm dev' Enter
+```
+
+- Setup, per-company credentials and troubleshooting: [INSTALL.md](INSTALL.md)
+- Workflow, sandbox details and known limits: [doc/SOLO-CTO-WORKFLOW.md](doc/SOLO-CTO-WORKFLOW.md)
+- The company package that `paperclipai company import` creates: [doc/solo-cto/company](doc/solo-cto/company)
+
+The upstream Paperclip README follows.
+
+---
+
 <p align="center">
   <img src="doc/assets/banner.jpg" alt="Paperclip is the app people use to manage AI agents for work." width="720" />
 </p>

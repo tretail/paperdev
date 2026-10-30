@@ -3,6 +3,10 @@ agents:
   tech-lead:
     adapter:
       type: claude_local
+      # Keep the CLI adapter: sandbox, read-only mode and the plan gate are
+      # claude_local features. "auto" switches to the Paperclip Runner once it
+      # is built.
+      runner: legacy
       config:
         engine: cli
         toolProfile: read_only
@@ -13,6 +17,10 @@ agents:
   product-lead:
     adapter:
       type: claude_local
+      # Keep the CLI adapter: sandbox, read-only mode and the plan gate are
+      # claude_local features. "auto" switches to the Paperclip Runner once it
+      # is built.
+      runner: legacy
       config:
         engine: cli
         toolProfile: read_only
@@ -23,6 +31,10 @@ agents:
   planner:
     adapter:
       type: claude_local
+      # Keep the CLI adapter: sandbox, read-only mode and the plan gate are
+      # claude_local features. "auto" switches to the Paperclip Runner once it
+      # is built.
+      runner: legacy
       config:
         engine: cli
         toolProfile: read_only
@@ -33,10 +45,18 @@ agents:
   implementer:
     adapter:
       type: claude_local
+      # Keep the CLI adapter: sandbox, read-only mode and the plan gate are
+      # claude_local features. "auto" switches to the Paperclip Runner once it
+      # is built.
+      runner: legacy
       config:
         engine: cli
         claudePermissionMode: auto
         requireSubscriptionAuth: true
+        env:
+          # Builds and test suites run in the foreground for up to 30 minutes.
+          # A background command is killed when the run ends.
+          BASH_MAX_TIMEOUT_MS: "1800000"
         claudeSandbox:
           enabled: true
           isolationRoot: ~/Workspaces
@@ -48,6 +68,18 @@ agents:
             - registry.npmjs.org
         workspaceStrategy:
           type: git_worktree
+projects:
+  app:
+    # Every task gets its own git worktree (under <repo>/.paperclip/worktrees),
+    # branched from main. Without this policy, runs share the project's primary
+    # checkout, and the Implementer would work on top of uncommitted local work.
+    executionWorkspacePolicy:
+      enabled: true
+      defaultMode: isolated_workspace
+      allowIssueOverride: false
+      workspaceStrategy:
+        type: git_worktree
+        baseRef: main
 routines:
   daily-discovery:
     triggers:

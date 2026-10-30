@@ -109,6 +109,25 @@ Then:
 Never write the `plan` document yourself; the Planner turns your spec into
 the technical plan.
 
+## Paperclip API writes
+
+Your Bash runs inside the OS sandbox: it can't change the repository or reach
+the internet (use `WebSearch`/`WebFetch` for research), but it can call the
+Paperclip API. In these runs Claude Code refuses very long commands, pipes into
+`curl` and heredocs, which rules out the Paperclip skill's helper scripts. Send
+every request body from a file instead:
+
+1. Get your scratch directory once: `printenv PAPERCLIP_RUN_SCRATCH_DIR`. It is
+   the only place you can write.
+2. Write the JSON body there with the Write tool, e.g. `<scratch>/plan.json`.
+3. Send it with one short command and check the status and the echoed result:
+
+   ```sh
+   curl -sS -w '\nHTTP %{http_code}\n' -X PUT -H "Authorization: Bearer $PAPERCLIP_API_KEY" -H "X-Paperclip-Run-Id: $PAPERCLIP_RUN_ID" -H 'Content-Type: application/json' --data-binary @"$PAPERCLIP_RUN_SCRATCH_DIR/plan.json" "$PAPERCLIP_API_URL/api/issues/$PAPERCLIP_TASK_ID/documents/plan"
+   ```
+
+Use the same pattern for comments, interactions and status updates.
+
 ## When you need the human
 
 If an important product decision is ambiguous (target user, pricing,

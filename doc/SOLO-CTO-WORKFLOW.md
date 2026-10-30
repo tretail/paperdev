@@ -66,9 +66,19 @@ All three agents use `engine: cli` and `requireSubscriptionAuth: true`.
 
 - Claude runs with `--permission-mode dontAsk`, which denies anything not
   pre-approved.
-- The `Edit`, `Write`, `MultiEdit` and `NotebookEdit` tools are not loaded.
-- Bash is limited to `curl` (for the Paperclip API) and `git log`, `show`,
-  `diff` and `status`.
+- The `Edit`, `MultiEdit` and `NotebookEdit` tools are not loaded. With
+  `claudeSandbox`, `Write` is loaded for the run's scratch directory only
+  (`$PAPERCLIP_RUN_SCRATCH_DIR`, outside every company folder), so agents can
+  send long API request bodies with `curl --data-binary @file`. Claude Code
+  refuses very long or piped commands in these runs.
+- Without `claudeSandbox`, Bash is limited to `curl` (for the Paperclip API)
+  and `git log`, `show`, `diff` and `status`. With `claudeSandbox`, the OS
+  sandbox gates Bash instead: any command may run, but writes to the company
+  folder and all internet access are denied. A prefix allowlist can't be used
+  there, because Claude Code refuses an allowlisted command that contains
+  `$VAR`, and every Paperclip API call needs `$PAPERCLIP_API_KEY`. Web research
+  uses Claude's own `WebSearch`/`WebFetch` tools, which the sandbox doesn't
+  restrict.
 - The workspace's project and local `.claude` settings are ignored.
 - Paperclip records `git status` and `HEAD` before and after the run. Any
   change fails the run with `read_only_run_modified_workspace`.
@@ -116,8 +126,17 @@ permission rules.
 | Bash writes | None; the OS denies writes | Own workspace and the repo's `.git`; other companies are denied |
 | Claude Read/Grep/Glob | Own company folder plus Paperclip's prompt bundle and skills | Everything except other companies and secrets |
 | Claude Edit/Write | Not loaded | Denied for other companies and secrets |
-| Secrets | `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.paperclip`, `~/.config/gh` unreadable | Same, except `~/.config/gh`, which it needs to open PRs |
-| Network | Paperclip API on localhost only | Localhost plus `allowedDomains` (GitHub, npm registry by default) |
+| Secrets | `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.paperclip`, `~/.pgpass`, `~/.config/gh` unreadable | Same, except `~/.config/gh`, which it needs to open PRs |
+| Network | Localhost only (the Paperclip API) | Localhost plus `allowedDomains` (GitHub, npm registry by default) |
+| Environment | The server's `DATABASE_URL`, its `pnpm dev` variables and its mise shell state are never passed on; tools resolve to each repo's pins through the mise shims | Same |
+
+**Localhost is reachable from every sandboxed command**, not just the
+Paperclip API. Any local service that trusts localhost connections is open to
+the agents. In particular, Postgres must require passwords over TCP (see
+INSTALL.md §4): with Postgres.app's default `trust` rules, an agent can log in
+as a superuser and run commands outside the sandbox. For the same reason,
+Paperclip must not run on its embedded Postgres (`127.0.0.1:54329`, fixed
+password `paperclip`): set `DATABASE_URL` in the instance env.
 
 A new company folder is picked up automatically on the next run. Use
 `extraDenyRead` to hide more paths.
@@ -153,9 +172,12 @@ adds the network domains it needs. Credentials come from that company only:
 A shell function keeps the AWS commands short:
 
 ```sh
-pcaws() { local t=~/Workspaces/$1/.paperclip-tools/aws; shift; AWS_CONFIG_FILE=$t/config HOME=$t aws "$@"; }
+pcaws() { local t=~/Workspaces/$1/.paperclip-tools/aws; shift; AWS_CONFIG_FILE=$t/config HOME=$t "$(mise which aws)" "$@"; }
 pcaws patlynk sso login --profile patlynk
 ```
+
+It calls the real binary, because a mise shim run with the changed `HOME`
+installs a second copy of aws into the tool home.
 
 How it works:
 - Paperclip puts per-run wrappers first on the agent's PATH. They run `aws`
@@ -342,6 +364,23 @@ trigger's cron or timezone, switch the trigger off, or pause it.
   a deny-write rule beats a narrower allow, so the worktree alone can't be
   carved out. Other companies and secrets stay protected.
 - **Allowed domains can carry data out.** Keep `allowedDomains` short.
+- **Go CLIs need the macOS trust service.** `gh` and `supabase` verify TLS
+  through `com.apple.trustd.agent`, which the sandbox blocks (`x509: OSStatus
+  -26276`). When an Implementer lists either in `claudeSandbox.tools`,
+  Paperclip sets `sandbox.enableWeakerNetworkIsolation`, which Claude Code
+  flags as a potential exfiltration path. Read-only runs never get it.
+- **JVM builds need a Gradle init script to reach the network.** Java ignores
+  `HTTPS_PROXY`, and the sandbox proxy URL carries a per-session credential.
+  `JAVA_TOOL_OPTIONS` can't carry it, because the JVM prints that variable on
+  every start. `doc/solo-cto/gradle/paperclip-sandbox-proxy.init.gradle` sets
+  the proxy inside each build instead (INSTALL.md §7.3). Maven or a bare
+  `java` command has no equivalent yet.
+- **JVM agent attach doesn't work.** On macOS it needs the per-user
+  `/var/folders` temp dir, which the sandbox denies writing. Paperclip points
+  `java.io.tmpdir` at the sandbox's `TMPDIR` and runs JVMs headless (the
+  sandbox can't reach the window server). Neither is a secret, so
+  `JAVA_TOOL_OPTIONS` can carry them. Attach ignores the temp-dir setting. Tests that self-attach, such
+  as Mockito's inline mock maker, need Mockito loaded as a `-javaagent`.
 - **Supabase direct database connections don't work.** The sandbox only
   proxies HTTP(S), so `supabase db push`, `link --password` or `psql` to
   Supabase fail. Use the Management API, or run them yourself when the agent

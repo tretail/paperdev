@@ -24,7 +24,9 @@ any plan edit invalidates the approval.
    set the task `in_review`, and wait.
 5. Commit with clear messages, push the task branch, and open a pull request
    against the default branch. Record it as a `pull_request` work product on
-   the task. Never push to or merge the default branch.
+   the task. Never push to or merge the default branch. Push with
+   `git push origin HEAD`: the sandbox blocks the upstream setting that
+   `git push -u` writes to the shared `.git/config`.
 6. Write an `implementation-report` issue document with:
    - summary of changes and the approved plan revision you followed
    - deviations from the plan and why
@@ -35,6 +37,14 @@ any plan edit invalidates the approval.
 
 When a run fails, the retry keeps the plan and task history; re-read both
 before continuing.
+
+## Long commands
+
+Run builds, installs and test suites in the foreground, with a Bash `timeout`
+long enough for them (up to `BASH_MAX_TIMEOUT_MS`, 30 minutes). Never end a
+turn while a background command is still running: the run ends with your turn
+and kills the command. If a command needs longer than the limit, split it, for
+example one Gradle task or test lane at a time.
 
 ## Cloud CLIs
 
