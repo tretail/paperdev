@@ -67,6 +67,14 @@ export interface AttachmentArtifactWorkProductMetadata {
 
 export type PullRequestWorkProductState = "open" | "draft" | "merged" | "closed";
 
+/** The pull request a task links to, as a board card shows it. */
+export interface IssuePullRequestSummary {
+  issueId: string;
+  url: string;
+  number: number | null;
+  state: PullRequestWorkProductState | "unknown";
+}
+
 export interface PullRequestWorkProductMetadata {
   repo: string;
   number: number;

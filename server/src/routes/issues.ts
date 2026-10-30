@@ -6,7 +6,13 @@ import { completeIssueCommentReceipt } from "../services/issue-comment-receipt.j
 import { taskInterruptionPresentation, taskInterruptionPresentations } from "../services/task-interruption-presentation.js";
 import { parseObject } from "../adapters/utils.js";
 import { prepareRestrictedWorkspaceRetry } from "../services/restricted-workspace-retry.js";
-import { issueSummariesQuerySchema, type IssueSummary } from "@paperclipai/shared";
+import {
+  ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS,
+  issuePullRequestSummariesQuerySchema,
+  issueSummariesQuerySchema,
+  type IssuePullRequestSummary,
+  type IssueSummary,
+} from "@paperclipai/shared";
 import { listIssueSummaries } from "../services/issue-summaries.js";
 import { assertNoCaseHandoffMutation } from "../services/heartbeat/case-handoff-lifecycle.js";
 import { assertLegacyRunTaskOwnership } from "../legacy-run-task-ownership.js";
@@ -8379,6 +8385,30 @@ export function issueRoutes(
       updatedAt: row.updatedAt,
       externalConversationState: row.externalConversationState,
     }));
+    res.setHeader("Cache-Control", "private, no-store");
+    res.json(summaries);
+  });
+
+  // The pull request each task links to, for board cards. Only tasks the actor can read.
+  router.get("/companies/:companyId/issues/pull-requests", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    assertCompanyAccess(req, companyId);
+    if (isTaskBridgeKeyActor(req)) {
+      res.status(403).json({ error: "Task bridge keys cannot use company-wide issue list APIs" });
+      return;
+    }
+    const parsed = issuePullRequestSummariesQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: `ids must be the only query parameter and contain one to ${ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS} comma-separated UUIDs`,
+      });
+      return;
+    }
+    const rows = await listIssueSummaries(
+      db, companyId, parsed.data.ids, await issueReadSqlCondition(db, req.actor), ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS,
+    );
+    const visible = await filterIssuesForActor(req, rows);
+    const summaries: IssuePullRequestSummary[] = await workProductsSvc.pullRequestSummaries(companyId, visible.map((row) => row.id));
     res.setHeader("Cache-Control", "private, no-store");
     res.json(summaries);
   });

@@ -2,9 +2,16 @@
 
 import { createRoot, type Root } from "react-dom/client";
 import { flushSync } from "react-dom";
-import type { Issue, IssueStatus } from "@paperclipai/shared";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { Issue, IssuePullRequestSummary, IssueStatus } from "@paperclipai/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getKanbanColumnTone, KanbanBoard, resolveKanbanTargetStatus } from "./KanbanBoard";
+
+const pullRequestsMock = vi.hoisted(() => ({ summaries: [] as IssuePullRequestSummary[] }));
+
+vi.mock("../api/issues", () => ({
+  issuesApi: { pullRequests: vi.fn(async () => pullRequestsMock.summaries) },
+}));
 
 vi.mock("@/lib/router", () => ({
   Link: ({
@@ -86,16 +93,19 @@ function renderBoard(
   document.body.appendChild(container);
   const root = createRoot(container);
   mountedRoots.push(root);
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
   const render = (nextProps: Partial<React.ComponentProps<typeof KanbanBoard>> & { issues: Issue[] }) => {
     act(() => {
       root.render(
-        <KanbanBoard
-          agents={[{ id: "agent-1", name: "Codex" }]}
-          liveIssueIds={new Set(["issue-todo-1"])}
-          onUpdateIssue={vi.fn()}
-          {...nextProps}
-        />,
+        <QueryClientProvider client={queryClient}>
+          <KanbanBoard
+            agents={[{ id: "agent-1", name: "Codex" }]}
+            liveIssueIds={new Set(["issue-todo-1"])}
+            onUpdateIssue={vi.fn()}
+            {...nextProps}
+          />
+        </QueryClientProvider>,
       );
     });
   };
@@ -108,6 +118,7 @@ function renderBoard(
 describe("KanbanBoard", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
+    pullRequestsMock.summaries = [];
   });
 
   afterEach(() => {
@@ -231,5 +242,34 @@ describe("KanbanBoard", () => {
     expect(resolveKanbanTargetStatus("done", issues)).toBe("done");
     expect(resolveKanbanTargetStatus("issue-blocked-2", issues)).toBe("blocked");
     expect(resolveKanbanTargetStatus("missing", issues)).toBeNull();
+  });
+
+  it("labels the in_review column Waiting", () => {
+    const { container } = renderBoard({ issues: createIssues(1, "in_review") });
+    expect(container.textContent).toContain("Waiting");
+    expect(container.textContent).not.toMatch(/In review/i);
+  });
+
+  it("links a card to its pull request in a new tab, outside the task link", async () => {
+    pullRequestsMock.summaries = [{
+      issueId: "issue-in_review-1",
+      url: "https://github.com/acme/app/pull/12345",
+      number: 12345,
+      state: "merged",
+    }];
+    const { container } = renderBoard({ issues: createIssues(2, "in_review") });
+    await vi.waitFor(() => expect(container.querySelector('a[href^="https://github.com"]')).not.toBeNull());
+
+    const link = container.querySelector<HTMLAnchorElement>('a[href^="https://github.com"]')!;
+    expect(link.getAttribute("href")).toBe("https://github.com/acme/app/pull/12345");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(link.textContent).toBe("#12345");
+    expect(link.getAttribute("aria-label")).toBe("Open pull request #12345 (merged) on GitHub");
+    expect(link.querySelector('[data-pr-state="merged"]')?.getAttribute("class")).toContain("text-(--pr-state-merged)");
+    // A link inside the task link would be invalid HTML and would open the task too.
+    expect(link.parentElement?.closest("a")).toBeNull();
+    // Only the card with a pull request gets a button.
+    expect(container.querySelectorAll('a[href^="https://github.com"]')).toHaveLength(1);
   });
 });

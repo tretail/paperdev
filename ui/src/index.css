@@ -373,6 +373,12 @@
   --status-task-icon-blocked: var(--status-task-blocked);         /* #dc2626 both modes */
   --status-task-icon-cancelled: #52585d;
   --status-task-icon-in_queue: var(--status-task-icon-in_progress); /* blocked shape, same mode-aware blue */
+  /* Pull request states, in GitHub's Primer colours so a card's PR button reads like
+     GitHub's own icon. Dark values in the `.dark` block below. */
+  --pr-state-open: #1a7f37;
+  --pr-state-draft: #59636e;
+  --pr-state-merged: #8250df;
+  --pr-state-closed: #cf222e;
 
   --folder-color-indigo: #6366f1;
   --folder-color-violet: #8b5cf6;
@@ -666,6 +672,10 @@
   --status-task-icon-in_review: #9474f0;  /* deeper than violet-400, reads purple */
   --status-task-icon-done: #34d06f;
   --status-task-icon-cancelled: #9a958a;
+  --pr-state-open: #3fb950;
+  --pr-state-draft: #9198a1;
+  --pr-state-merged: #a371f7;
+  --pr-state-closed: #f85149;
 }
 
 .streamlined-task-detail-surface {

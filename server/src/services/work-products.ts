@@ -3,13 +3,14 @@ import { notifyApprovalQueueWork } from "./approval-work-notifications.js";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
 import { executionWorkspaces, heartbeatRunEvents, issueWorkProducts, workspaceRuntimeServices } from "@paperclipai/db";
-import type { IssueWorkProduct } from "@paperclipai/shared";
+import type { IssuePullRequestSummary, IssueWorkProduct, PullRequestWorkProductState } from "@paperclipai/shared";
 import { unprocessable } from "../errors.js";
 import { insertRowsInChunks } from "./batch-insert.js";
 import { notifyTerminalWorkspaceWork } from "./terminal-workspace-work.js";
 import {
   createPullRequestMergeDetailsResolver,
   extractGitHubPullRequestReferences,
+  setBoundedPullRequestCacheEntry,
   type PullRequestMergeDetailsResolver,
 } from "./github-pull-request-merge.js";
 import {
@@ -129,6 +130,76 @@ export async function refreshPullRequestWorkProductMetadata(
   }));
 }
 
+/** Live pull request states by company and PR, checked on GitHub at most once per TTL. */
+export type PullRequestStateCache = Map<string, { state: PullRequestWorkProductState; expiresAt: number }>;
+const pullRequestStateCache: PullRequestStateCache = new Map();
+const PULL_REQUEST_STATE_TTL_MS = 2 * 60_000;
+
+function recordedPullRequestState(product: IssueWorkProduct): PullRequestWorkProductState | null {
+  const state = product.metadata?.state;
+  if (state === "open" || state === "draft" || state === "merged" || state === "closed") return state;
+  return product.status === "merged" || product.status === "closed" || product.status === "draft" ? product.status : null;
+}
+
+/**
+ * One pull request per issue, for board cards: the primary one, else the most
+ * recently updated. Merged and closed pull requests keep their recorded state;
+ * the others are checked on GitHub at most once per TTL, falling back to the
+ * recorded status. Read-only: nothing is written back.
+ */
+export async function summarizeIssuePullRequests(
+  products: readonly IssueWorkProduct[],
+  resolvePullRequestDetails: PullRequestMergeDetailsResolver,
+  options: { cache?: PullRequestStateCache; now?: number } = {},
+): Promise<IssuePullRequestSummary[]> {
+  const cache = options.cache ?? pullRequestStateCache;
+  const now = options.now ?? Date.now();
+  const chosen = new Map<string, IssueWorkProduct>();
+  const ordered = products
+    .filter((product) => product.type === "pull_request")
+    .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)
+      || new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  for (const product of ordered) if (!chosen.has(product.issueId)) chosen.set(product.issueId, product);
+
+  const summaries = await Promise.all([...chosen.values()].map(async (product): Promise<IssuePullRequestSummary | null> => {
+    const metadata = product.metadata ?? {};
+    const metadataUrl = typeof metadata.url === "string" ? metadata.url : null;
+    const repo = typeof metadata.repo === "string" ? metadata.repo
+      : typeof metadata.repository === "string" ? metadata.repository : null;
+    const recordedNumber = nonNegativeInteger(metadata.number) || null;
+    const reference = extractGitHubPullRequestReferences([
+      product.url,
+      metadataUrl,
+      repo && recordedNumber ? `${repo}#${recordedNumber}` : null,
+    ])[0] ?? null;
+    const url = product.url ?? metadataUrl
+      ?? (reference ? `https://github.com/${reference.owner}/${reference.repo}/pull/${reference.number}` : null);
+    if (!url) return null;
+
+    const recorded = recordedPullRequestState(product);
+    let state: IssuePullRequestSummary["state"] = recorded ?? "open";
+    if (reference && recorded !== "merged" && recorded !== "closed") {
+      const key = `${product.companyId}:${reference.owner}/${reference.repo}#${reference.number}`.toLowerCase();
+      const cached = cache.get(key);
+      if (cached && cached.expiresAt > now) {
+        state = cached.state;
+      } else {
+        try {
+          const details = await resolvePullRequestDetails(product.companyId, reference);
+          if (details.workProductState) {
+            state = details.workProductState;
+            setBoundedPullRequestCacheEntry(cache, key, { state, expiresAt: now + PULL_REQUEST_STATE_TTL_MS });
+          }
+        } catch {
+          // GitHub unreachable or the PR is hidden: keep the recorded state.
+        }
+      }
+    }
+    return { issueId: product.issueId, url, number: recordedNumber ?? reference?.number ?? null, state };
+  }));
+  return summaries.filter((summary): summary is IssuePullRequestSummary => summary !== null);
+}
+
 function toIssueWorkProduct(row: IssueWorkProductRow): IssueWorkProduct {
   return {
     id: row.id,
@@ -230,6 +301,20 @@ export function workProductService(
       return options.refreshPullRequests
         ? refreshPullRequestWorkProductMetadata(reconciled, resolvePullRequestDetails)
         : reconciled;
+    },
+
+    /** The pull request each of `issueIds` links to, for board cards. Callers check issue access first. */
+    pullRequestSummaries: async (companyId: string, issueIds: readonly string[]): Promise<IssuePullRequestSummary[]> => {
+      if (issueIds.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(issueWorkProducts)
+        .where(and(
+          eq(issueWorkProducts.companyId, companyId),
+          eq(issueWorkProducts.type, "pull_request"),
+          inArray(issueWorkProducts.issueId, [...issueIds]),
+        ));
+      return summarizeIssuePullRequests(rows.map(toIssueWorkProduct), resolvePullRequestDetails);
     },
 
     latestRunDiffSummary: async (runId: string): Promise<WorkProductDiffSummary | null> => {

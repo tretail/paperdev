@@ -18,15 +18,20 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { useQuery } from "@tanstack/react-query";
 import { StatusIcon } from "./StatusIcon";
 import { PriorityIcon } from "./PriorityIcon";
+import { PullRequestStateIcon } from "./PullRequestStateIcon";
 import { SHOW_TASK_PRIORITY_UI } from "../lib/ui-flags";
 import { Identity } from "./Identity";
-import type { Issue, IssueStatus } from "@paperclipai/shared";
+import type { Issue, IssuePullRequestSummary, IssueStatus } from "@paperclipai/shared";
+import { issuesApi } from "../api/issues";
+import { queryKeys } from "../lib/queryKeys";
 import { AlertTriangle } from "lucide-react";
 import { isSuccessfulRunHandoffRequired } from "../lib/successful-run-handoff";
 import { collectSubtreeLiveCounts } from "../lib/liveIssueIds";
 import { cn } from "../lib/utils";
+import { IN_REVIEW_STATUS_LABEL } from "../lib/issue-status-label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { HorizontalScrollViewport } from "./HorizontalScrollViewport";
@@ -133,6 +138,7 @@ export function getKanbanColumnTone(status: IssueStatus) {
 }
 
 function statusLabel(status: string): string {
+  if (status === "in_review") return IN_REVIEW_STATUS_LABEL;
   return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -169,6 +175,7 @@ function KanbanColumn({
   agents,
   liveIssueIds,
   subtreeLiveCounts,
+  pullRequests,
   compactCards = false,
   collapsed = false,
   visibleCount,
@@ -180,6 +187,7 @@ function KanbanColumn({
   agents?: Agent[];
   liveIssueIds?: Set<string>;
   subtreeLiveCounts?: ReadonlyMap<string, number>;
+  pullRequests?: ReadonlyMap<string, IssuePullRequestSummary>;
   compactCards?: boolean;
   collapsed?: boolean;
   visibleCount: number;
@@ -246,6 +254,7 @@ function KanbanColumn({
               agents={agents}
               isLive={liveIssueIds?.has(issue.id)}
               subtreeLiveCount={subtreeLiveCounts?.get(issue.id) ?? 0}
+              pullRequest={pullRequests?.get(issue.id)}
               compact={compactCards}
               className={tone.card}
             />
@@ -270,6 +279,33 @@ function KanbanColumn({
   );
 }
 
+/* ── Pull request button ── */
+
+/** Opens the task's pull request on GitHub, showing GitHub's icon for its state and its number. */
+function PullRequestCardLink({ pullRequest, compact }: { pullRequest: IssuePullRequestSummary; compact: boolean }) {
+  const state = pullRequest.state === "unknown" ? "state unknown" : pullRequest.state;
+  const label = `Open pull request${pullRequest.number ? ` #${pullRequest.number}` : ""} (${state}) on GitHub`;
+  return (
+    <a
+      href={pullRequest.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={label}
+      aria-label={label}
+      // The card is draggable and opens the task; pressing this button does neither.
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+      className={cn(
+        "absolute inline-flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-muted-foreground no-underline transition-colors hover:border-foreground/30 hover:text-foreground",
+        compact ? "bottom-2 right-2" : "bottom-2.5 right-2.5",
+      )}
+    >
+      <PullRequestStateIcon state={pullRequest.state} />
+      {pullRequest.number ? `#${pullRequest.number}` : null}
+    </a>
+  );
+}
+
 /* ── Draggable Card ── */
 
 function KanbanCard({
@@ -277,6 +313,7 @@ function KanbanCard({
   agents,
   isLive,
   subtreeLiveCount = 0,
+  pullRequest,
   isOverlay,
   compact = false,
   className,
@@ -285,6 +322,7 @@ function KanbanCard({
   agents?: Agent[];
   isLive?: boolean;
   subtreeLiveCount?: number;
+  pullRequest?: IssuePullRequestSummary;
   isOverlay?: boolean;
   compact?: boolean;
   className?: string;
@@ -315,7 +353,7 @@ function KanbanCard({
       {...attributes}
       {...listeners}
       className={cn(
-        "block cursor-grab active:cursor-grabbing transition-shadow",
+        "relative block cursor-grab active:cursor-grabbing transition-shadow",
         isDragging && !isOverlay ? "opacity-30" : "",
         isOverlay ? "shadow-lg ring-1 ring-primary/20" : "hover:shadow-sm",
         compact ? "p-2" : "p-2.5",
@@ -365,7 +403,8 @@ function KanbanCard({
           )}
         </div>
         <p className={`${compact ? "mb-1.5 text-xs" : "mb-2 text-sm"} leading-snug line-clamp-2`}>{issue.title}</p>
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Room for the pull request button, which sits outside the task link. */}
+        <div className={cn("flex items-center gap-2 min-w-0", pullRequest && "pr-16")}>
           {/* PAP-411: priority UI hidden behind SHOW_TASK_PRIORITY_UI. */}
           {SHOW_TASK_PRIORITY_UI && <PriorityIcon priority={issue.priority} />}
           {issue.assigneeAgentId && (() => {
@@ -380,6 +419,7 @@ function KanbanCard({
           })()}
         </div>
       </Link>
+      {pullRequest ? <PullRequestCardLink pullRequest={pullRequest} compact={compact} /> : null}
     </Card>
   );
 }
@@ -433,6 +473,20 @@ export function KanbanBoard({
     [issues, liveIssueIds],
   );
 
+  // A board shows one company's tasks.
+  const companyId = issues[0]?.companyId ?? null;
+  const sortedIssueIds = useMemo(() => [...new Set(issues.map((issue) => issue.id))].sort(), [issues]);
+  const { data: pullRequestSummaries } = useQuery({
+    queryKey: queryKeys.issues.pullRequests(companyId ?? "", sortedIssueIds),
+    queryFn: ({ signal }) => issuesApi.pullRequests(companyId!, sortedIssueIds, { signal }),
+    enabled: Boolean(companyId) && sortedIssueIds.length > 0,
+    staleTime: 60_000,
+  });
+  const pullRequests = useMemo(
+    () => new Map((pullRequestSummaries ?? []).map((summary) => [summary.issueId, summary])),
+    [pullRequestSummaries],
+  );
+
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as string);
   }
@@ -467,6 +521,7 @@ export function KanbanBoard({
       agents={agents}
       liveIssueIds={liveIssueIds}
       subtreeLiveCounts={subtreeLiveCounts}
+      pullRequests={pullRequests}
       compactCards={compactCards}
       // Compact mode also collapses empty lanes to labeled rails.
       collapsed={collapsedStatusSet.has(status) || (collapsedStatusSet.size > 0 && columnIssues[status].length === 0)}
@@ -493,7 +548,7 @@ export function KanbanBoard({
         : <div className="flex gap-3 overflow-x-auto pb-4 -mx-2 px-2">{columns}</div>}
       <DragOverlay>
         {activeIssue ? (
-          <KanbanCard issue={activeIssue} agents={agents} isOverlay compact={compactCards} />
+          <KanbanCard issue={activeIssue} agents={agents} pullRequest={pullRequests.get(activeIssue.id)} isOverlay compact={compactCards} />
         ) : null}
       </DragOverlay>
     </DndContext>

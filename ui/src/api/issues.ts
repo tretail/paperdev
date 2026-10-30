@@ -1,6 +1,6 @@
 import type { SetIssueTitle } from "@paperclipai/shared";
-import { ISSUE_SUMMARIES_MAX_IDS } from "@paperclipai/shared";
-import type { IssueSummary } from "@paperclipai/shared";
+import { ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS, ISSUE_SUMMARIES_MAX_IDS } from "@paperclipai/shared";
+import type { IssuePullRequestSummary, IssueSummary } from "@paperclipai/shared";
 import type { ExecutionReconciliation } from "@paperclipai/shared";
 import type {
   AcceptedPlanDecompositionSummary,
@@ -311,6 +311,16 @@ export const issuesApi = {
     // never join a request sent with the previous account's cookie.
     detachInflightGet(path);
     return api.get<IssueSummary[]>(path, { ...options, cache: "no-store" });
+  },
+  /** The pull request each task links to, for board cards. Pages through any number of IDs. */
+  pullRequests: async (companyId: string, issueIds: readonly string[], options?: RequestOptions): Promise<IssuePullRequestSummary[]> => {
+    const ids = [...new Set(issueIds.map((id) => id.trim().toLowerCase()))].sort();
+    const pages: Promise<IssuePullRequestSummary[]>[] = [];
+    for (let start = 0; start < ids.length; start += ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS) {
+      const params = new URLSearchParams({ ids: ids.slice(start, start + ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS).join(",") });
+      pages.push(api.get<IssuePullRequestSummary[]>(`/companies/${companyId}/issues/pull-requests?${params}`, { ...options, cache: "no-store" }));
+    }
+    return (await Promise.all(pages)).flat();
   },
   /** Fetch every page for bounded task-detail relations, not just the default first page. */
   listAll: async (companyId: string, filters: Omit<IssueListFilters, "limit" | "offset" | "sortField" | "sortDir" | "afterId" | "attention">, options?: RequestOptions): Promise<Issue[]> => {

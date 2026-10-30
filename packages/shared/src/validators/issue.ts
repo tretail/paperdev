@@ -1,7 +1,7 @@
 import { CHAT_PROVIDERS } from "../types/chat-channels.js";
 import { taskWorkspaceSelectionSchema } from "./task-workspace.js";
 import { z } from "zod";
-import { ISSUE_SUMMARIES_MAX_IDS } from "../constants.js";
+import { ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS, ISSUE_SUMMARIES_MAX_IDS } from "../constants.js";
 
 import {
   ISSUE_EXECUTION_DECISION_OUTCOMES,
@@ -50,6 +50,12 @@ import { questionSetToAskUserQuestionsPayload } from "../question-set.js";
 export const issueSummariesQuerySchema = z.object({
   ids: z.string().transform((value) => value.split(",").map((id) => id.trim().toLowerCase()))
     .pipe(z.array(z.string().guid()).min(1).max(ISSUE_SUMMARIES_MAX_IDS))
+    .transform((ids) => [...new Set(ids)]),
+}).strict();
+
+export const issuePullRequestSummariesQuerySchema = z.object({
+  ids: z.string().transform((value) => value.split(",").map((id) => id.trim().toLowerCase()))
+    .pipe(z.array(z.string().guid()).min(1).max(ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS))
     .transform((ids) => [...new Set(ids)]),
 }).strict();
 

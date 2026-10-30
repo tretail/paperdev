@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   enrichWorkProductMetadataWithDiff,
   refreshPullRequestWorkProductMetadata,
+  summarizeIssuePullRequests,
   workProductDiffSummaryFromEventPayload,
   workProductService,
 } from "../services/work-products.ts";
@@ -210,5 +211,67 @@ describe("workProductService", () => {
     expect(txSelect).toHaveBeenCalledTimes(1);
     expect(txUpdate).toHaveBeenCalledTimes(2);
     expect(result?.reviewState).toBe("ready_for_review");
+  });
+});
+
+describe("summarizeIssuePullRequests", () => {
+  const github = (number: number) => `https://github.com/acme/app/pull/${number}`;
+  const openDetails = { state: "open" as const, workProductState: "open" as const, headRef: null, headSha: null };
+
+  it("keeps merged and closed pull requests without asking GitHub", async () => {
+    const resolve = vi.fn(async () => openDetails);
+    const summaries = await summarizeIssuePullRequests([
+      createWorkProductRow({ issueId: "issue-1", url: github(7), status: "merged" }),
+      createWorkProductRow({ issueId: "issue-2", url: github(9), status: "active", metadata: { state: "closed", number: 9 } }),
+    ] as any, resolve, { cache: new Map() });
+    expect(summaries).toEqual([
+      { issueId: "issue-1", url: github(7), number: 7, state: "merged" },
+      { issueId: "issue-2", url: github(9), number: 9, state: "closed" },
+    ]);
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it("checks open pull requests on GitHub at most once per TTL", async () => {
+    const cache = new Map();
+    const products = [createWorkProductRow({ issueId: "issue-1", url: github(12), status: "active" })] as any;
+    const resolve = vi.fn(async () => ({ ...openDetails, state: "merged" as const, workProductState: "merged" as const }));
+    const now = Date.parse("2026-10-30T12:00:00Z");
+
+    await expect(summarizeIssuePullRequests(products, resolve, { cache, now })).resolves.toEqual([
+      { issueId: "issue-1", url: github(12), number: 12, state: "merged" },
+    ]);
+    await summarizeIssuePullRequests(products, resolve, { cache, now: now + 60_000 });
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect(resolve).toHaveBeenCalledWith("company-1", { host: "github.com", owner: "acme", repo: "app", number: 12 });
+    await summarizeIssuePullRequests(products, resolve, { cache, now: now + 3 * 60_000 });
+    expect(resolve).toHaveBeenCalledTimes(2);
+  });
+
+  it("falls back to the stored status when GitHub can't be reached", async () => {
+    const resolve = vi.fn(async () => { throw new Error("rate limited"); });
+    const summaries = await summarizeIssuePullRequests([
+      createWorkProductRow({ issueId: "issue-1", url: github(3), status: "draft" }),
+      createWorkProductRow({ issueId: "issue-2", url: github(4), status: "ready_for_review" }),
+      createWorkProductRow({ issueId: "issue-3", url: "https://example.com/pr/5", status: "active" }),
+    ] as any, resolve, { cache: new Map() });
+    expect(summaries.map((summary) => [summary.issueId, summary.number, summary.state])).toEqual([
+      ["issue-1", 3, "draft"],
+      ["issue-2", 4, "open"],
+      ["issue-3", null, "open"],
+    ]);
+    expect(resolve).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows the primary pull request, else the most recently updated, and skips ones without a link", async () => {
+    const resolve = vi.fn(async () => openDetails);
+    const summaries = await summarizeIssuePullRequests([
+      createWorkProductRow({ id: "old", issueId: "issue-1", url: github(1), status: "merged", isPrimary: false, updatedAt: new Date("2026-10-01") }),
+      createWorkProductRow({ id: "new", issueId: "issue-1", url: github(2), status: "merged", isPrimary: false, updatedAt: new Date("2026-10-20") }),
+      createWorkProductRow({ id: "primary", issueId: "issue-2", url: github(3), status: "merged", isPrimary: true, updatedAt: new Date("2026-10-01") }),
+      createWorkProductRow({ id: "newer", issueId: "issue-2", url: github(4), status: "merged", isPrimary: false, updatedAt: new Date("2026-10-20") }),
+      createWorkProductRow({ issueId: "issue-3", url: null, status: "merged" }),
+      createWorkProductRow({ issueId: "issue-4", url: github(5), type: "branch", status: "active" }),
+    ] as any, resolve, { cache: new Map() });
+    expect(summaries.map((summary) => [summary.issueId, summary.number]).sort()).toEqual([["issue-1", 2], ["issue-2", 3]]);
   });
 });

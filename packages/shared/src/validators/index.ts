@@ -426,6 +426,7 @@ export {
 export {
   createIssueSchema,
   issueSummariesQuerySchema,
+  issuePullRequestSummariesQuerySchema,
   setIssueTitleSchema,
   type SetIssueTitle,
   createIssueInputSchema,

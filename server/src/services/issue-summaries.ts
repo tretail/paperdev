@@ -9,8 +9,9 @@ export async function listIssueSummaries(
   companyId: string,
   ids: readonly string[],
   readCondition: SQL<boolean>,
+  maxIds: number = ISSUE_SUMMARIES_MAX_IDS,
 ) {
-  if (ids.length > ISSUE_SUMMARIES_MAX_IDS) throw new Error("Too many issue summary IDs");
+  if (ids.length > maxIds) throw new Error("Too many issue summary IDs");
   if (ids.length === 0) return [];
   const rows = await db.select({
     id: issues.id,

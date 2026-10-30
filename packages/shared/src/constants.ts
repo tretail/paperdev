@@ -1,5 +1,7 @@
 export const COMPANY_STATUSES = ["active", "paused", "archived"] as const;
 export const ISSUE_SUMMARIES_MAX_IDS = 5;
+/** Issues per request for board pull request summaries. */
+export const ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS = 100;
 export type CompanyStatus = (typeof COMPANY_STATUSES)[number];
 
 export const DEPLOYMENT_MODES = ["local_trusted", "authenticated"] as const;

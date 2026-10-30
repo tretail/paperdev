@@ -647,6 +647,7 @@ export type {
   IssueWorkProductReviewState,
   AttachmentArtifactWorkProductMetadata,
   PullRequestWorkProductState,
+  IssuePullRequestSummary,
   PullRequestWorkProductMetadata,
   CommitWorkProductMetadata,
 } from "./work-product.js";
