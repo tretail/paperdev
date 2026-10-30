@@ -3530,6 +3530,10 @@ export function sanitizeInheritedPaperclipEnv(
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...baseEnv };
   delete env.PAPERCLIPAI_CMD;
+  // The control plane's own database. Agents must never inherit its
+  // credentials, and a workspace app reading DATABASE_URL must not migrate
+  // or query the Paperclip database instead of its own.
+  delete env.DATABASE_URL;
   for (const key of Object.keys(env)) {
     if (AGENT_IDENTITY_ENV_KEYS.includes(key.toUpperCase())) {
       delete env[key];
@@ -3541,7 +3545,72 @@ export function sanitizeInheritedPaperclipEnv(
     if (key === "PAPERCLIP_LISTEN_PORT") continue;
     delete env[key];
   }
-  return env;
+  return stripLauncherToolchainEnv(env, baseEnv.PATH ?? "");
+}
+
+// Set by npm/pnpm for the script that launched the server (`pnpm dev`). They
+// describe Paperclip's own package and package manager, not the agent's repo.
+const PACKAGE_SCRIPT_ENV_KEYS = new Set([
+  "npm_command",
+  "npm_execpath",
+  "npm_node_execpath",
+  "npm_config_user_agent",
+  "npm_config_node_gyp",
+  "PNPM_PACKAGE_NAME",
+  "PNPM_SCRIPT_SRC_DIR",
+  "pnpm_config_verify_deps_before_run",
+]);
+const PACKAGE_SCRIPT_ENV_PREFIXES = ["npm_lifecycle_", "npm_package_"];
+
+function isLauncherToolchainPathEntry(entry: string): boolean {
+  const normalized = entry.split(path.sep).join("/").replace(/\/+$/, "");
+  return normalized.includes("/mise/installs/") || normalized.endsWith("/node_modules/.bin");
+}
+
+/**
+ * Agents must resolve the toolchain their own workspace pins. The server
+ * inherits the shell that launched it: `pnpm dev` puts Paperclip's
+ * `node_modules/.bin` first, and an activated mise puts the install
+ * directories of Paperclip's own node and pnpm ahead of the mise shims.
+ * Remove those entries (only the ones inherited from `launcherPath`) and the
+ * launcher's shell state, keeping the shims so tools resolve per directory.
+ */
+export function stripLauncherToolchainEnv(
+  env: NodeJS.ProcessEnv,
+  launcherPath: string = process.env.PATH ?? "",
+): NodeJS.ProcessEnv {
+  const next: NodeJS.ProcessEnv = { ...env };
+  for (const key of Object.keys(next)) {
+    if (
+      key.startsWith("__MISE_") ||
+      key === "MISE_SHELL" ||
+      PACKAGE_SCRIPT_ENV_KEYS.has(key) ||
+      PACKAGE_SCRIPT_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))
+    ) {
+      delete next[key];
+    }
+  }
+  const launcherEntries = new Set(launcherPath.split(path.delimiter).filter(isLauncherToolchainPathEntry));
+  if (launcherEntries.size === 0 || typeof next.PATH !== "string") return next;
+
+  const kept: string[] = [];
+  let shims: { index: number; dir: string } | null = null;
+  for (const entry of next.PATH.split(path.delimiter)) {
+    if (!launcherEntries.has(entry)) {
+      kept.push(entry);
+      continue;
+    }
+    const miseRoot = `${path.sep}mise${path.sep}`;
+    const installsAt = entry.indexOf(`${miseRoot}installs${path.sep}`);
+    if (installsAt >= 0 && !shims) {
+      shims = { index: kept.length, dir: `${entry.slice(0, installsAt + miseRoot.length)}shims` };
+    }
+  }
+  if (shims && !kept.some((entry) => entry.split(path.sep).join("/").replace(/\/+$/, "").endsWith("/mise/shims"))) {
+    kept.splice(shims.index, 0, shims.dir);
+  }
+  next.PATH = kept.join(path.delimiter);
+  return next;
 }
 
 export function defaultPathForPlatform() {

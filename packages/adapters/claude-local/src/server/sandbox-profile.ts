@@ -5,10 +5,12 @@ import path from "node:path";
 import { promisify } from "node:util";
 import {
   claudeSandboxToolDomains,
+  claudeSandboxToolsNeedTrustd,
   companyToolHome,
   PERSONAL_TOOL_STATE_DIRS,
   readClaudeSandboxTools,
   TOOLCHAIN_CACHE_DIRS,
+  pnpmLockDirs,
   type ClaudeSandboxToolName,
 } from "./sandbox-tools.js";
 
@@ -45,8 +47,14 @@ export interface ClaudeSandboxProfile {
   tools: ClaudeSandboxToolName[];
   /** Tool rules for the read-only profile (dontAsk allowlist). */
   readOnlyAllowedTools: string[];
-  /** Narrower read-only denials inside the allowlist (the tool home). */
+  /** Narrower read-only denials inside the allowlist (the tool home, extraDenyRead). */
   readOnlyDisallowedTools: string[];
+  /**
+   * `Edit(...)` rules (they govern the Write tool) for the read-only profile:
+   * only the run's scratch directory, outside every workspace, so request
+   * bodies can be sent with `curl --data-binary @file`.
+   */
+  readOnlyWritableTools: string[];
   /** Tool deny rules for full-permission profiles. */
   disallowedTools: string[];
 }
@@ -58,7 +66,8 @@ export class ClaudeSandboxProfileError extends Error {
   }
 }
 
-const SECRET_DIRS = [".ssh", ".aws", ".gnupg", ".paperclip"];
+/** Personal secrets no agent may read (`.pgpass` is a file, denied by exact path). */
+const SECRET_DIRS = [".ssh", ".aws", ".gnupg", ".paperclip", ".pgpass"];
 /** Only read-only agents lose GitHub CLI credentials; the implementer opens PRs. */
 const READ_ONLY_SECRET_DIRS = [".config/gh"];
 
@@ -109,6 +118,11 @@ function ruleFor(tool: string, absolutePath: string): string {
   return `${tool}(/${absolutePath}/**)`;
 }
 
+/** `//abs/**` never matches `//abs` itself, so a denied file (e.g. `.env`) needs its exact path too. */
+function denyRulesFor(tools: string[], absolutePath: string): string[] {
+  return tools.flatMap((tool) => [`${tool}(/${absolutePath})`, ruleFor(tool, absolutePath)]);
+}
+
 async function gitCommonDir(cwd: string): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync("git", ["-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"]);
@@ -145,6 +159,8 @@ export async function resolveClaudeSandboxProfile(input: {
   readOnly: boolean;
   promptBundleDir: string;
   instructionsDir?: string | null;
+  /** The run's scratch directory; read-only profiles may write only there. */
+  scratchDir?: string | null;
   homeDir?: string;
 }): Promise<ClaudeSandboxProfile> {
   const homeDir = input.homeDir ?? os.homedir();
@@ -198,6 +214,7 @@ export async function resolveClaudeSandboxProfile(input: {
       ...(writableGitDir && !isWithin(writableGitDir, cwd) ? [writableGitDir] : []),
       // Dependency installs and CLI token refreshes.
       ...TOOLCHAIN_CACHE_DIRS.map((dir) => path.join(homeDir, dir)),
+      ...(typeof process.getuid === "function" ? pnpmLockDirs(await realpathOrResolved("/tmp"), process.getuid()) : []),
       ...(tools.length > 0 ? [toolHome] : []),
     ];
   }
@@ -208,8 +225,16 @@ export async function resolveClaudeSandboxProfile(input: {
       failIfUnavailable: true,
       allowUnsandboxedCommands: false,
       excludedCommands: [],
-      // Read-only runs keep their explicit Bash allowlist on top of the sandbox.
-      ...(input.readOnly ? { autoAllowBashIfSandboxed: false } : {}),
+      // The OS sandbox gates read-only Bash: writes to the company folder and
+      // all internet egress are denied. A prefix allowlist cannot be used here:
+      // Claude Code refuses any allowlisted command containing `$VAR`, and every
+      // Paperclip API call needs `$PAPERCLIP_API_KEY` (probed on 2.1.312).
+      ...(input.readOnly ? { autoAllowBashIfSandboxed: true } : {}),
+      // Go CLIs (gh, supabase) verify TLS through com.apple.trustd.agent, which
+      // needs weaker network isolation. Only full-permission runs with such a
+      // tool get it (read-only profiles have no tools); they already have
+      // egress to that tool's domains, the larger exfiltration channel.
+      ...(claudeSandboxToolsNeedTrustd(tools) ? { enableWeakerNetworkIsolation: true } : {}),
       filesystem,
       network: {
         // Required on macOS for the Paperclip API on localhost.
@@ -230,15 +255,33 @@ export async function resolveClaudeSandboxProfile(input: {
   const deniedForTools = (await Promise.all(
     [...siblings, ...secretDirs, ...extraDenyRead].map((dir) => denyAroundRuntimePaths(dir, runtimeReadPaths)),
   )).flat();
-  const disallowedTools = deniedForTools.flatMap((dir) => [
-    ruleFor("Read", dir),
-    ruleFor("Edit", dir),
-    ruleFor("Write", dir),
-  ]);
+  const disallowedTools = deniedForTools.flatMap((entry) => denyRulesFor(["Read", "Edit", "Write"], entry));
 
+  // The read-only allowlist covers the whole company folder, so paths hidden
+  // inside it (the tool home, extraDenyRead files such as `.env`) need denials.
   const readOnlyDisallowedTools = input.readOnly
-    ? [ruleFor("Read", toolHome), ruleFor("Grep", toolHome), ruleFor("Glob", toolHome)]
+    ? [toolHome, ...extraDenyRead].flatMap((entry) => denyRulesFor(["Read", "Grep", "Glob"], entry))
     : [];
 
-  return { companyRoot, toolHome, tools, settings, readOnlyAllowedTools, readOnlyDisallowedTools, disallowedTools };
+  // Long request bodies can't go on the command line (Claude Code refuses very
+  // long or piped commands in dontAsk mode), so read-only runs may write files
+  // to their scratch directory, never inside a company folder. Claude Code
+  // checks the Write tool against `Edit(...)` rules (a `Write(...)` rule has no
+  // effect). Rules cover both the given path and its real path (`/var` vs
+  // `/private/var` on macOS).
+  const scratchDir = input.readOnly && input.scratchDir ? await realpathOrResolved(input.scratchDir) : null;
+  const readOnlyWritableTools = scratchDir && !isWithin(scratchDir, isolationRoot)
+    ? [...new Set([path.resolve(input.scratchDir!), scratchDir])].map((dir) => ruleFor("Edit", dir))
+    : [];
+
+  return {
+    companyRoot,
+    toolHome,
+    tools,
+    settings,
+    readOnlyAllowedTools,
+    readOnlyDisallowedTools,
+    readOnlyWritableTools,
+    disallowedTools,
+  };
 }

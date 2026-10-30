@@ -1,7 +1,11 @@
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
+
+const execFileAsync = promisify(execFile);
 import {
   claudeSandboxToolDomains,
   cleanupClaudeToolRuntime,
@@ -86,6 +90,26 @@ describe("stageClaudeToolRuntime", () => {
     expect(zshenv.indexOf(`. '${previous}/.zshenv'`)).toBeLessThan(zshenv.indexOf("export PATH="));
     const bashrc = await fs.readFile(path.join(staged.directory, "profile", ".bashrc"), "utf8");
     expect(bashrc).toContain(`. '${previous}/.bashrc'`);
+  });
+
+  it("runs JVMs headless with the shell's TMPDIR once, keeping other JVM options", async () => {
+    const staged = await stageClaudeToolRuntime({
+      runId: runId(),
+      tools: ["gh"],
+      toolHome: "/ws/a/.paperclip-tools",
+      env: {},
+      basePath: await fakeBinDir([]),
+    });
+    const profile = path.join(staged.directory, "profile", ".bashrc");
+    const sourced = (env: Record<string, string>) =>
+      execFileAsync("/bin/sh", ["-c", `. '${profile}'; . '${profile}'; printf %s "$JAVA_TOOL_OPTIONS"`], { env: { PATH: "/usr/bin:/bin", ...env } })
+        .then(({ stdout }) => stdout);
+    expect(await sourced({ TMPDIR: "/tmp/claude-501" })).toBe("-Djava.awt.headless=true -Djava.io.tmpdir=/tmp/claude-501");
+    expect(await sourced({ TMPDIR: "/tmp/claude-501", JAVA_TOOL_OPTIONS: "-Xss4m" }))
+      .toBe("-Djava.awt.headless=true -Djava.io.tmpdir=/tmp/claude-501 -Xss4m");
+    expect(await sourced({ TMPDIR: "/tmp/claude-501", JAVA_TOOL_OPTIONS: "-Djava.io.tmpdir=/x -Djava.awt.headless=false" }))
+      .toBe("-Djava.io.tmpdir=/x -Djava.awt.headless=false");
+    expect(await sourced({})).toBe("-Djava.awt.headless=true");
   });
 
   it("reports CLIs that are not installed", async () => {

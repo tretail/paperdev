@@ -170,6 +170,8 @@ export interface ClaudeSandboxArgs {
   settings: Record<string, unknown>;
   readOnlyAllowedTools: string[];
   readOnlyDisallowedTools?: string[];
+  /** Path-scoped `Edit(...)` rules for the Write tool (the run's scratch directory only). */
+  readOnlyWritableTools?: string[];
   disallowedTools: string[];
 }
 
@@ -197,15 +199,20 @@ export function buildClaudePermissionProfileArgs(
   const baseAllowed = sandbox
     ? [...sandbox.readOnlyAllowedTools, ...CLAUDE_READ_ONLY_ALLOWED_TOOLS.filter((tool) => !UNSCOPED_READ_TOOLS.has(tool))]
     : [...CLAUDE_READ_ONLY_ALLOWED_TOOLS];
-  const allowed = [...new Set([...baseAllowed, ...profile.allowedTools])];
+  // Bare `Edit`/`Write` denies would beat the scratch-scoped `Edit(...)` allow
+  // rules; without them, dontAsk still refuses every write outside scratch, and
+  // only the Write tool is loaded (not Edit, MultiEdit or NotebookEdit).
+  const writable = sandbox?.readOnlyWritableTools ?? [];
+  const allowed = [...new Set([...baseAllowed, ...writable, ...profile.allowedTools])];
   const disallowed = [...new Set([
-    ...CLAUDE_READ_ONLY_DISALLOWED_TOOLS,
+    ...CLAUDE_READ_ONLY_DISALLOWED_TOOLS.filter((tool) => writable.length === 0 || (tool !== "Write" && tool !== "Edit")),
     ...profile.disallowedTools,
     ...(sandbox?.readOnlyDisallowedTools ?? []),
   ])];
+  const tools = writable.length > 0 ? [...CLAUDE_READ_ONLY_TOOLS, "Write"] : [...CLAUDE_READ_ONLY_TOOLS];
   return [
     "--permission-mode", "dontAsk",
-    "--tools", CLAUDE_READ_ONLY_TOOLS.join(","),
+    "--tools", tools.join(","),
     "--allowedTools", ...allowed,
     "--disallowedTools", ...disallowed,
     ...sandboxArgs,

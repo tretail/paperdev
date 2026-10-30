@@ -34,11 +34,18 @@ interface ToolPreset {
   /** Binary run with HOME set to `<toolHome>/<tool>`. */
   homeWrapper?: string;
   env?: (toolHome: string) => Record<string, string>;
+  /**
+   * Go binary: macOS TLS verification goes through `com.apple.trustd.agent`,
+   * which the sandbox blocks unless weaker network isolation is enabled
+   * (otherwise `x509: OSStatus -26276`).
+   */
+  needsTrustd?: boolean;
 }
 
 const TOOL_PRESETS: Record<ClaudeSandboxToolName, ToolPreset> = {
   gh: {
     domains: ["github.com", "api.github.com", "uploads.github.com", "codeload.github.com", "objects.githubusercontent.com"],
+    needsTrustd: true,
   },
   aws: {
     domains: ["*.amazonaws.com", "*.awsapps.com"],
@@ -66,6 +73,7 @@ const TOOL_PRESETS: Record<ClaudeSandboxToolName, ToolPreset> = {
   supabase: {
     domains: ["api.supabase.com", "*.supabase.co", "*.supabase.com"],
     homeWrapper: "supabase",
+    needsTrustd: true,
   },
 };
 
@@ -75,6 +83,15 @@ export const PERSONAL_TOOL_STATE_DIRS = [".azure", ".supabase", "Library/Prefere
 /** Package-manager caches the implementer must write to install dependencies. */
 export const TOOLCHAIN_CACHE_DIRS = [".npm", ".cache", "Library/Caches", "Library/pnpm", ".bun/install/cache"];
 
+/**
+ * pnpm 12 keeps its install locks in fixed per-user folders under /tmp and
+ * ignores TMPDIR (ERR_PNPM_STORE_DIR_OPEN_OPERATION_LOCK without them).
+ */
+export function pnpmLockDirs(tmpRoot: string, uid: number): string[] {
+  return ["pnpm-store-operation-locks", "pnpm-dir-locks", "pnpm-modules-swaps"]
+    .map((name) => path.join(tmpRoot, `${name}-${uid}`));
+}
+
 export function readClaudeSandboxTools(value: unknown): ClaudeSandboxToolName[] {
   if (!Array.isArray(value)) return [];
   const known = new Set<string>(CLAUDE_SANDBOX_TOOL_NAMES);
@@ -83,6 +100,10 @@ export function readClaudeSandboxTools(value: unknown): ClaudeSandboxToolName[] 
 
 export function claudeSandboxToolDomains(tools: readonly ClaudeSandboxToolName[]): string[] {
   return [...new Set(tools.flatMap((tool) => TOOL_PRESETS[tool].domains))];
+}
+
+export function claudeSandboxToolsNeedTrustd(tools: readonly ClaudeSandboxToolName[]): boolean {
+  return tools.some((tool) => TOOL_PRESETS[tool].needsTrustd === true);
 }
 
 export function companyToolHome(companyRoot: string): string {
@@ -140,6 +161,25 @@ async function resolveBinary(name: string, searchPath: string, exclude: string):
 const ZSH_PROFILES = [".zshenv", ".zprofile", ".zshrc"];
 const BASH_PROFILES = [".bashrc", ".bash_profile", ".profile"];
 
+// JVM defaults that can't work in the sandbox. Nested shells source the profile
+// again; each guard keeps one copy and an explicit setting wins.
+// - The JVM ignores TMPDIR: on macOS it takes java.io.tmpdir from the per-user
+//   /var/folders temp dir, which the sandbox denies writing (the Kotlin compiler
+//   fails on its `.alive` file there). Point it at the shell's TMPDIR instead.
+// - The sandbox can't reach the window server, so a JVM that touches AWT on
+//   macOS hangs starting AppKit (LWCToolkit.initAppkit). Run headless.
+const JVM_SANDBOX_PROFILE = [
+  'case " ${JAVA_TOOL_OPTIONS:-} " in',
+  '  *" -Djava.io.tmpdir="*) ;;',
+  '  *) if [ -n "${TMPDIR:-}" ]; then export JAVA_TOOL_OPTIONS="-Djava.io.tmpdir=$TMPDIR${JAVA_TOOL_OPTIONS:+ $JAVA_TOOL_OPTIONS}"; fi ;;',
+  "esac",
+  'case " ${JAVA_TOOL_OPTIONS:-} " in',
+  '  *" -Djava.awt.headless="*) ;;',
+  '  *) export JAVA_TOOL_OPTIONS="-Djava.awt.headless=true${JAVA_TOOL_OPTIONS:+ $JAVA_TOOL_OPTIONS}" ;;',
+  "esac",
+  "",
+].join("\n");
+
 /**
  * Stage wrappers and env for one run. Existing ZDOTDIR/BASH_ENV profiles
  * (e.g. Paperclip's GitHub launchers) are sourced first, then the tool bin
@@ -182,7 +222,7 @@ export async function stageClaudeToolRuntime(input: {
 
   const previousZdotdir = input.env.ZDOTDIR;
   const previousBashEnv = input.env.BASH_ENV;
-  const prependPath = `export PATH=${shellQuote(binDir)}:"$PATH"\n`;
+  const prependPath = `export PATH=${shellQuote(binDir)}:"$PATH"\n${JVM_SANDBOX_PROFILE}`;
   for (const name of ZSH_PROFILES) {
     const source = previousZdotdir ? `[ -f ${shellQuote(path.join(previousZdotdir, name))} ] && . ${shellQuote(path.join(previousZdotdir, name))}\n` : "";
     await fs.writeFile(path.join(profileDir, name), source + prependPath, { mode: 0o600 });

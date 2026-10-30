@@ -55,7 +55,7 @@ describe("resolveClaudeSandboxProfile", () => {
       enabled: true,
       failIfUnavailable: true,
       allowUnsandboxedCommands: false,
-      autoAllowBashIfSandboxed: false,
+      autoAllowBashIfSandboxed: true,
       network: { allowLocalBinding: true, allowedDomains: [] },
     });
     expect(profile.readOnlyAllowedTools).toContain(`Read(/${path.join(ws, "a")}/**)`);
@@ -70,6 +70,13 @@ describe("resolveClaudeSandboxProfile", () => {
     expect(sandboxSettings.filesystem.denyWrite).not.toContain(path.join(ws, "a"));
     expect(sandboxSettings.network.allowedDomains).toEqual(["github.com"]);
     expect(sandboxSettings.autoAllowBashIfSandboxed).toBeUndefined();
+    expect(sandboxSettings.enableWeakerNetworkIsolation).toBeUndefined();
+    // gh is a Go binary: its TLS check needs the macOS trust service.
+    const withGh = { ...sandbox, tools: ["gh" as const] };
+    const ghImplementer = await resolveClaudeSandboxProfile({ sandbox: withGh, cwd: repo, readOnly: false, promptBundleDir: bundle, homeDir: home });
+    expect((ghImplementer.settings.sandbox as any).enableWeakerNetworkIsolation).toBe(true);
+    const ghPlanner = await resolveClaudeSandboxProfile({ sandbox: withGh, cwd: repo, readOnly: true, promptBundleDir: bundle, homeDir: home });
+    expect((ghPlanner.settings.sandbox as any).enableWeakerNetworkIsolation).toBeUndefined();
     expect(sandboxSettings.filesystem.denyRead).not.toContain(path.join(home, ".config/gh"));
 
     expect(profile.disallowedTools).toEqual(expect.arrayContaining([
@@ -77,11 +84,59 @@ describe("resolveClaudeSandboxProfile", () => {
       `Edit(/${path.join(ws, "b")}/**)`,
       `Read(/${path.join(home, ".ssh")}/**)`,
       `Read(/${path.join(home, ".paperclip/instances/default/secrets")}/**)`,
+      `Read(/${path.join(home, ".pgpass")})`,
     ]));
+    expect(sandboxSettings.filesystem.denyRead).toContain(path.join(home, ".pgpass"));
     // Paths Claude needs (prompt bundle, skills) are carved out, not denied.
     expect(profile.disallowedTools.some((rule) => rule.includes(bundle))).toBe(false);
     expect(profile.disallowedTools).not.toContain(`Read(/${path.join(ws, "paperclip")}/**)`);
     expect(profile.disallowedTools).not.toContain(`Read(/${path.join(home, ".paperclip")}/**)`);
+  });
+
+  it("denies an extraDenyRead file inside the company folder by its exact path", async () => {
+    const { home, ws, repo, bundle } = await fixture();
+    const envFile = path.join(ws, "a", ".env");
+    await fs.writeFile(envFile, "SECRET=1\n");
+    const withEnv = { ...sandbox, extraDenyRead: ["~/Workspaces/a/.env"] };
+
+    const implementer = await resolveClaudeSandboxProfile({ sandbox: withEnv, cwd: repo, readOnly: false, promptBundleDir: bundle, homeDir: home });
+    expect((implementer.settings.sandbox as any).filesystem.denyRead).toContain(envFile);
+    expect(implementer.disallowedTools).toEqual(expect.arrayContaining([`Read(/${envFile})`, `Edit(/${envFile})`, `Write(/${envFile})`]));
+
+    const planner = await resolveClaudeSandboxProfile({ sandbox: withEnv, cwd: repo, readOnly: true, promptBundleDir: bundle, homeDir: home });
+    const args = buildClaudePermissionProfileArgs(resolveClaudePermissionProfile({ toolProfile: "read_only" }), { targetIsRemote: false }, planner);
+    expect(args.slice(args.indexOf("--disallowedTools") + 1)).toEqual(expect.arrayContaining([`Read(/${envFile})`, `Grep(/${envFile})`, `Glob(/${envFile})`]));
+    // The company folder itself stays readable.
+    expect(args).toContain(`Read(/${path.join(ws, "a")}/**)`);
+  });
+
+  it("lets read-only runs write only to their scratch directory, outside every company folder", async () => {
+    const { home, ws, repo, bundle } = await fixture();
+    const scratch = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-run-scratch-")));
+    roots.push(scratch);
+    const planner = await resolveClaudeSandboxProfile({ sandbox, cwd: repo, readOnly: true, promptBundleDir: bundle, scratchDir: scratch, homeDir: home });
+    // Claude Code checks the Write tool against Edit(...) rules.
+    expect(planner.readOnlyWritableTools).toEqual([`Edit(/${scratch}/**)`]);
+    const args = buildClaudePermissionProfileArgs(resolveClaudePermissionProfile({ toolProfile: "read_only" }), { targetIsRemote: false }, planner);
+    const tools = args[args.indexOf("--tools") + 1].split(",");
+    expect(tools).toContain("Write");
+    expect(tools).not.toContain("Edit");
+    const allowed = args.slice(args.indexOf("--allowedTools") + 1, args.indexOf("--disallowedTools"));
+    expect(allowed).toContain(`Edit(/${scratch}/**)`);
+    expect(allowed.some((rule) => /^(Edit|Write)\(/.test(rule) && rule.includes(ws))).toBe(false);
+    const disallowed = args.slice(args.indexOf("--disallowedTools") + 1, args.indexOf("--settings"));
+    expect(disallowed).not.toContain("Write");
+    expect(disallowed).not.toContain("Edit");
+    expect(disallowed).toEqual(expect.arrayContaining(["MultiEdit", "NotebookEdit"]));
+
+    // A scratch directory inside a company folder never becomes writable.
+    const insideScratch = await resolveClaudeSandboxProfile({ sandbox, cwd: repo, readOnly: true, promptBundleDir: bundle, scratchDir: path.join(ws, "a", "tmp"), homeDir: home });
+    expect(insideScratch.readOnlyWritableTools).toEqual([]);
+    const insideArgs = buildClaudePermissionProfileArgs(resolveClaudePermissionProfile({ toolProfile: "read_only" }), { targetIsRemote: false }, insideScratch);
+    expect(insideArgs.slice(insideArgs.indexOf("--disallowedTools") + 1)).toEqual(expect.arrayContaining(["Edit", "Write"]));
+
+    const implementer = await resolveClaudeSandboxProfile({ sandbox, cwd: repo, readOnly: false, promptBundleDir: bundle, scratchDir: scratch, homeDir: home });
+    expect(implementer.readOnlyWritableTools).toEqual([]);
   });
 
   it("rejects a workspace outside the isolation root or equal to it", async () => {
@@ -128,6 +183,14 @@ describe("resolveClaudeSandboxProfile", () => {
     expect(implementer.tools).toEqual(["aws"]);
     expect(implementer.toolHome).toBe(toolHome);
     expect(implementerSettings.filesystem.allowWrite).toEqual(expect.arrayContaining([toolHome, path.join(home, ".npm")]));
+    if (typeof process.getuid === "function") {
+      const tmp = await fs.realpath("/tmp");
+      expect(implementerSettings.filesystem.allowWrite).toEqual(expect.arrayContaining([
+        path.join(tmp, `pnpm-store-operation-locks-${process.getuid()}`),
+        path.join(tmp, `pnpm-dir-locks-${process.getuid()}`),
+        path.join(tmp, `pnpm-modules-swaps-${process.getuid()}`),
+      ]));
+    }
     expect(implementerSettings.network.allowedDomains).toEqual(expect.arrayContaining(["github.com", "*.amazonaws.com"]));
     expect(implementerSettings.filesystem.denyRead).toEqual(expect.arrayContaining([path.join(home, ".azure"), path.join(home, "Library/Preferences/.wrangler")]));
 

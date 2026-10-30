@@ -43,6 +43,7 @@ import {
   buildInvocationEnvForLogs,
   ensureAbsoluteDirectory,
   ensurePathInEnv,
+  stripLauncherToolchainEnv,
   isForbiddenConfigEnvKey,
   isPaperclipRuntimeEnvKey,
   refreshPaperclipWorkspaceEnvForExecution,
@@ -1460,6 +1461,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
             readOnly: permissionProfile.kind === "read_only",
             promptBundleDir: effectivePromptBundleAddDir,
             instructionsDir: instructionsFilePath ? path.dirname(instructionsFilePath) : null,
+            scratchDir: env.PAPERCLIP_RUN_SCRATCH_DIR ?? null,
           })
         : null;
     } catch (error) {
@@ -1488,7 +1490,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
         tools: sandboxProfile.tools,
         toolHome: sandboxProfile.toolHome,
         env,
-        basePath: env.PATH ?? process.env.PATH ?? "",
+        basePath: env.PATH ?? stripLauncherToolchainEnv({ PATH: process.env.PATH }).PATH ?? "",
       });
       toolRuntimeStaged = true;
       Object.assign(env, toolRuntime.env);
