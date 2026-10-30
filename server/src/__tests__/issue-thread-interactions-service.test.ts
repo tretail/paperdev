@@ -4647,6 +4647,38 @@ describeEmbeddedPostgres("issueThreadInteractionService", () => {
       });
     });
 
+    it("gives tasks accepted from suggest_tasks their own execution workspace", async () => {
+      const { companyId, issueId, goalId } = await seedAcceptGateFixture();
+      const created = await interactionsSvc.create({
+        id: issueId,
+        companyId,
+      }, {
+        kind: "suggest_tasks",
+        continuationPolicy: "wake_assignee",
+        payload: {
+          version: 1,
+          tasks: [
+            { clientKey: "first", title: "First follow-up" },
+            { clientKey: "second", title: "Second follow-up" },
+          ],
+        },
+      }, {
+        userId: "local-board",
+      });
+
+      await interactionsSvc.acceptInteraction(
+        acceptIssueScope(issueId, companyId, goalId),
+        created.id,
+        {},
+        { userId: "local-board" },
+      );
+
+      // Sharing the source issue's workspace would put every accepted task on its branch.
+      const children = await db.select().from(issues).where(eq(issues.parentId, issueId));
+      expect(children).toHaveLength(2);
+      for (const child of children) expect(child.executionWorkspaceId).toBeNull();
+    });
+
     it("allows accept when the issue has no execution workspace attached", async () => {
       const { companyId, issueId } = await seedConfirmationIssue("No execution workspace accept");
 

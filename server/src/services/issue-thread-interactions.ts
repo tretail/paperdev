@@ -4317,8 +4317,14 @@ export function issueThreadInteractionService(
             } } : {}),
           } satisfies Parameters<ReturnType<typeof issueService>["createChild"]>[1];
           const service = issueService(tx as unknown as Db);
+          // Each accepted task is its own piece of work: inherit the parent's
+          // workspace strategy, not its workspace, or every accepted task
+          // would share the source issue's worktree and branch.
           const createdIssue = parentIssueId
-            ? (await service.createChild(parentIssueId, createInput)).issue
+            ? (await service.createChild(parentIssueId, {
+                ...createInput,
+                executionWorkspaceInheritanceMode: "strategy_only",
+              })).issue
             : await service.create(issue.companyId, createInput);
 
           const parentIdentifier =
