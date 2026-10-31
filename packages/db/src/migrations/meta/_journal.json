@@ -2899,6 +2899,13 @@
       "when": 1793289641595,
       "tag": "0415_groovy_hobgoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 416,
+      "version": "7",
+      "when": 1793398771629,
+      "tag": "0416_modern_gideon",
+      "breakpoints": true
     }
   ]
 }

@@ -393,6 +393,20 @@ export function projectRoutes(db: Db) {
     if (!implementer) throw unprocessable("Plan approval implementer must be an agent in this company");
   }
 
+  // Intake routing decides who first handles every task a human creates, so
+  // only board users set it, and the agent must belong to the company.
+  async function assertIntakeAgentMutationAllowed(req: Request, companyId: string, intakeAgentId: string | null | undefined) {
+    if (intakeAgentId === undefined) return;
+    if (req.actor.type !== "board") throw forbidden("Only board users can change a project's intake agent");
+    if (intakeAgentId === null) return;
+    const [agent] = await db
+      .select({ id: agents.id })
+      .from(agents)
+      .where(and(eq(agents.id, intakeAgentId), eq(agents.companyId, companyId)))
+      .limit(1);
+    if (!agent) throw unprocessable("Intake agent must be an agent in this company");
+  }
+
   router.post("/companies/:companyId/projects", validate(createProjectSchema), async (req, res) => {
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);
@@ -405,6 +419,7 @@ export function projectRoutes(db: Db) {
     const receiptOnly = req.get("X-Paperclip-Receipt-Only") === "true";
     if (receiptOnly && !idempotencyKey) throw unprocessable("Project receipt recovery requires an idempotency key");
     await assertPlanApprovalPolicyMutationAllowed(req, companyId, projectData.planApprovalPolicy);
+    await assertIntakeAgentMutationAllowed(req, companyId, projectData.intakeAgentId);
     projectData.privacyOwnerUserId = req.actor.type === "board" ? req.actor.userId ?? null : req.actor.type === "agent" ? req.actor.onBehalfOfUserId ?? null : null;
     const runContext = req.actor.type === "agent" && req.actor.source === "agent_jwt" && req.actor.runId
       ? await projectToolContext(db, req.actor, true) : null;
@@ -524,6 +539,7 @@ export function projectRoutes(db: Db) {
     if (!(await assertProjectReadAllowed(req, res, existing))) return;
     const body = { ...req.body };
     await assertPlanApprovalPolicyMutationAllowed(req, existing.companyId, body.planApprovalPolicy);
+    await assertIntakeAgentMutationAllowed(req, existing.companyId, body.intakeAgentId);
     if (body.visibility !== undefined) {
       if (!(await assertCanManageProjectPrivacy(req, res, existing))) return;
     }

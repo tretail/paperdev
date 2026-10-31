@@ -41,9 +41,11 @@ export function queueIssueAssignmentWakeup(input: {
    * conversation in its own batch, because a reviewed chat run attests one. */
   chatConversationId?: string | null;
   rethrowOnError?: boolean;
+  /** Wake the assignee even though the issue is parked in Backlog (intake routing only). */
+  allowBacklog?: boolean;
   durableChatRequest?: DurableChatWakeupRequest;
 }) {
-  if (!input.issue.assigneeAgentId || input.issue.status === "backlog") return;
+  if (!input.issue.assigneeAgentId || (input.issue.status === "backlog" && !input.allowBacklog)) return;
 
   return input.heartbeat
     .wakeup(input.issue.assigneeAgentId, {

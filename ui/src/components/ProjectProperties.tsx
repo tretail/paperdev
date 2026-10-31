@@ -48,6 +48,7 @@ export type ProjectConfigFieldKey =
   | "status"
   | "visibility"
   | "plan_approval_policy"
+  | "intake_agent"
   | "goals"
   | "env"
   | "workspace_storage_provider"
@@ -241,7 +242,6 @@ export function ProjectProperties({ project, repositories, onUpdate, onFieldUpda
   const { data: companyAgents } = useQuery({
     queryKey: queryKeys.agents.list(project.companyId),
     queryFn: () => agentsApi.list(project.companyId),
-    enabled: Boolean(planApprovalPolicy),
   });
 
   const { data: experimentalSettings } = useQuery({
@@ -555,6 +555,27 @@ export function ProjectProperties({ project, repositories, onUpdate, onFieldUpda
               {planApprovalPolicy
                 ? "Agents can only investigate and plan until you approve the task's current plan revision. Approval hands the task to the implementer."
                 : "Agents may implement tasks without an approved plan."}
+            </p>
+          </div>
+        </PropertyRow>
+        <PropertyRow label={<FieldLabel label="Intake" state={fieldState("intake_agent")} />} alignStart>
+          <div className="space-y-2">
+            <select
+              aria-label="Intake agent"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              disabled={!onUpdate && !onFieldUpdate}
+              value={project.intakeAgentId ?? ""}
+              onChange={(event) => commitField("intake_agent", { intakeAgentId: event.target.value || null })}
+            >
+              <option value="">No intake agent</option>
+              {(companyAgents ?? []).map((agent) => (
+                <option key={agent.id} value={agent.id}>{agent.name}</option>
+              ))}
+            </select>
+            <p className="text-(length:--text-micro) text-muted-foreground">
+              {project.intakeAgentId
+                ? "Tasks you create go to this agent in Backlog to be investigated."
+                : "Tasks you create go to the assignee you pick."}
             </p>
           </div>
         </PropertyRow>

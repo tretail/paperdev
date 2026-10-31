@@ -12675,6 +12675,7 @@ export function issueRoutes(
         return;
       }
     }
+    let routedToIntake = false;
     if (createBody.projectId) {
       const selectedProject = await projectsSvc.getById(createBody.projectId);
       if (!selectedProject || selectedProject.companyId !== companyId) {
@@ -12689,6 +12690,18 @@ export function issueRoutes(
       if (!projectDecision.allowed) {
         res.status(404).json({ error: "Project not found" });
         return;
+      }
+      // Intake: a board user's new top-level task, unassigned or assigned to the
+      // project's intake agent, goes to that agent in Backlog to be investigated.
+      if (
+        req.actor.type === "board" &&
+        selectedProject.intakeAgentId &&
+        !createBody.parentId &&
+        !createBody.assigneeUserId &&
+        (!createBody.assigneeAgentId || createBody.assigneeAgentId === selectedProject.intakeAgentId)
+      ) {
+        Object.assign(createBody, { assigneeAgentId: selectedProject.intakeAgentId, status: "backlog" });
+        routedToIntake = true;
       }
     }
       const createAssignmentScope = {
@@ -12978,6 +12991,8 @@ export function issueRoutes(
           contextSource: "issue.create",
           requestedByActorType: actor.actorType,
           requestedByActorId: actor.actorId,
+          // The intake agent investigates while the task stays parked in Backlog.
+          allowBacklog: routedToIntake,
         });
       }
       await queueTaskWatchdogEvaluation(issue, actor.runId);

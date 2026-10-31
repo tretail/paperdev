@@ -475,6 +475,8 @@ function AccountNewIssueDialog({ ignoreDefaults }: { ignoreDefaults: boolean }) 
   const [status, setStatus] = useState("todo");
   const [priority, setPriority] = useState("");
   const [assigneeValue, setAssigneeValue] = useState("");
+  // An assignee picked by hand, or passed in by the caller, wins over the project's intake agent.
+  const assigneeChosenRef = useRef(false);
   const [reviewerValue, setReviewerValue] = useState("");
   const [approverValue, setApproverValue] = useState("");
   const [watchdogAgentId, setWatchdogAgentId] = useState("");
@@ -901,6 +903,7 @@ function AccountNewIssueDialog({ ignoreDefaults }: { ignoreDefaults: boolean }) 
       setProjectId(defaultProjectId);
       setProjectWorkspaceId(defaultProjectWorkspaceId);
       setAssigneeValue(assigneeValueFromSelection(newIssueDefaults));
+      assigneeChosenRef.current = Boolean(newIssueDefaults.assigneeAgentId || newIssueDefaults.assigneeUserId);
       setAssigneeModelLane("primary");
       setAssigneeModelOverride("");
       setAssigneeThinkingEffort("");
@@ -921,6 +924,7 @@ function AccountNewIssueDialog({ ignoreDefaults }: { ignoreDefaults: boolean }) 
       setProjectId(defaultProjectId);
       setProjectWorkspaceId(newIssueDefaults.projectWorkspaceId ?? defaultProjectWorkspaceIdForProject(defaultProject));
       setAssigneeValue(assigneeValueFromSelection(newIssueDefaults));
+      assigneeChosenRef.current = Boolean(newIssueDefaults.assigneeAgentId || newIssueDefaults.assigneeUserId);
       setReviewerValue("");
       setApproverValue("");
 
@@ -1001,6 +1005,7 @@ function AccountNewIssueDialog({ ignoreDefaults }: { ignoreDefaults: boolean }) 
       setProjectId(defaultProjectId);
       setProjectWorkspaceId(newIssueDefaults.projectWorkspaceId ?? defaultProjectWorkspaceIdForProject(defaultProject));
       setAssigneeValue(assigneeValueFromSelection(newIssueDefaults));
+      assigneeChosenRef.current = Boolean(newIssueDefaults.assigneeAgentId || newIssueDefaults.assigneeUserId);
       setReviewerValue("");
       setApproverValue("");
 
@@ -1034,6 +1039,7 @@ function AccountNewIssueDialog({ ignoreDefaults }: { ignoreDefaults: boolean }) 
     setStatus("todo");
     setPriority("");
     setAssigneeValue("");
+    assigneeChosenRef.current = false;
     setReviewerValue("");
     setApproverValue("");
 
@@ -1279,6 +1285,10 @@ function AccountNewIssueDialog({ ignoreDefaults }: { ignoreDefaults: boolean }) 
     !isUsingParentExecutionWorkspace;
   const recentAssigneeIds = useMemo(() => getRecentAssigneeIds(), [newIssueOpen]);
   const recentProjectIds = useMemo(() => getRecentProjectIds(), [newIssueOpen]);
+  const intakeAgent = useMemo(() => {
+    const intakeAgentId = orderedProjects.find((project) => project.id === projectId)?.intakeAgentId;
+    return intakeAgentId ? (agents ?? []).find((agent) => agent.id === intakeAgentId) ?? null : null;
+  }, [orderedProjects, projectId, agents]);
   const assigneeOptions = useMemo<InlineEntityOption[]>(
     () => [
       ...currentUserAssigneeOption(currentUserId),
@@ -1307,16 +1317,25 @@ function AccountNewIssueDialog({ ignoreDefaults }: { ignoreDefaults: boolean }) 
     const targets = agents.filter(isAgentTaskTarget);
     const fallback = targets.find((agent) => agent.id === primaryAgent?.primaryAgentId)
       ?? targets.find((agent) => agent.role === "ceo") ?? targets[0];
-    setAssigneeValue(recent ?? (fallback ? assigneeValueFromSelection({ assigneeAgentId: fallback.id }) : ""));
+    setAssigneeValue((intakeAgent && assigneeValueFromSelection({ assigneeAgentId: intakeAgent.id }))
+      ?? recent ?? (fallback ? assigneeValueFromSelection({ assigneeAgentId: fallback.id }) : ""));
   }, [newIssueOpen, effectiveCompanyId, agents, assigneeOptions, sessionFetched, membersFetched, primaryAgent?.loading, primaryAgent?.primaryAgentId]);
+  // The project's intake agent takes new tasks to Backlog to investigate them first.
+  useEffect(() => {
+    if (!newIssueOpen || !intakeAgent || assigneeChosenRef.current) return;
+    setAssigneeValue(assigneeValueFromSelection({ assigneeAgentId: intakeAgent.id }));
+  }, [newIssueOpen, intakeAgent]);
   useEffect(() => {
     if (!newIssueOpen || !effectiveCompanyId || !defaultProjectPendingRef.current || !projects) return;
     defaultProjectPendingRef.current = false;
     const available = new Set(orderedProjects.filter((project) => !project.archivedAt).map((project) => project.id));
     const last = getLastProjectId(effectiveCompanyId);
+    // With nothing remembered, a company's only project is the default, so a
+    // new task doesn't start without a codebase.
+    const onlyProject = available.size === 1 ? [...available][0]! : "";
     const remembered = last !== undefined
       ? (available.has(last) ? last : "")
-      : (getRecentProjectIds().find((id) => available.has(id)) ?? "");
+      : (getRecentProjectIds().find((id) => available.has(id)) ?? onlyProject);
     setProjectId(remembered);
   }, [newIssueOpen, effectiveCompanyId, projects, orderedProjects]);
   const projectOptions = useMemo<InlineEntityOption[]>(
@@ -1486,6 +1505,7 @@ function AccountNewIssueDialog({ ignoreDefaults }: { ignoreDefaults: boolean }) 
                 if (next.assigneeAgentId) trackRecentAssignee(next.assigneeAgentId, effectiveCompanyId ?? undefined);
                 if (next.assigneeUserId) trackRecentAssigneeUser(next.assigneeUserId, effectiveCompanyId ?? undefined);
                 setAssigneeValue(value);
+                assigneeChosenRef.current = true;
                 setComposerSettings(null);
                 setAssigneeModelLane("primary");
                 setAssigneeModelOverride("");
@@ -1684,6 +1704,11 @@ function AccountNewIssueDialog({ ignoreDefaults }: { ignoreDefaults: boolean }) 
                           <span className="font-medium">In Progress</span>.
                         </span>
                       </div>
+                    ) : null}
+                    {intakeAgent && assigneeValue === assigneeValueFromSelection({ assigneeAgentId: intakeAgent.id }) ? (
+                      <p data-testid="new-issue-intake-note" className="mx-4 mb-2 text-xs text-muted-foreground">
+                        Goes to Backlog for {intakeAgent.name} to investigate before any planning.
+                      </p>
                     ) : null}
 
                     {selectedAssigneeAgent?.status === "paused" ? (

@@ -19,6 +19,8 @@ export const projects = pgTable(
     personalOwnerUserId: text("personal_owner_user_id"),
     status: text("status").notNull().default("backlog"),
     leadAgentId: uuid("lead_agent_id").references(() => agents.id),
+    /** Tasks a board user creates here go to this agent in Backlog, and it is woken to investigate them. */
+    intakeAgentId: uuid("intake_agent_id").references(() => agents.id, { onDelete: "set null" }),
     targetDate: date("target_date"),
     color: text("color"),
     icon: text("icon"),

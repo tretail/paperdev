@@ -485,7 +485,33 @@ describe("NewIssueDialog", () => {
     act(() => next.root.unmount());
   });
 
+  it("preselects the project's intake agent and says the task goes to Backlog", async () => {
+    mockAgentsApi.list.mockResolvedValue(defaultAgents);
+    mockProjectsApi.list.mockResolvedValue([
+      { id: "project-1", name: "Alpha", description: null, archivedAt: null, color: "#445566", intakeAgentId: "worker" },
+    ]);
+    const { root } = renderDialog(container);
+    await waitForAssertion(() => expect(container.querySelector('[data-testid="new-issue-intake-note"]')?.textContent)
+      .toContain("Goes to Backlog for Worker"));
+    await typeTextareaValue(container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Describe a task…"]')!, "Polls in the event chat");
+    act(() => container.querySelector<HTMLButtonElement>('[aria-label="Create task"]')!.click());
+    await waitForAssertion(() => expect(mockIssuesApi.create).toHaveBeenCalled());
+    expect(mockIssuesApi.create.mock.calls[0][1]).toMatchObject({ projectId: "project-1", assigneeAgentId: "worker" });
+    act(() => root.unmount());
+  });
+
+  it("defaults to the company's only project when none is remembered", async () => {
+    const { root } = renderDialog(container);
+    await waitForAssertion(() => expect(container.querySelector('[data-slot="new-issue-compact-control"]')?.textContent).toContain("project-1"));
+    await typeTextareaValue(container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Describe a task…"]')!, "Check the only-project default");
+    act(() => container.querySelector<HTMLButtonElement>('[aria-label="Create task"]')!.click());
+    await waitForAssertion(() => expect(mockIssuesApi.create).toHaveBeenCalled());
+    expect(mockIssuesApi.create.mock.calls[0][1].projectId).toBe("project-1");
+    act(() => root.unmount());
+  });
+
   it("remembers a project selection even when the composer is dismissed without submitting", async () => {
+    trackRecentProject("", "company-1");
     const { root } = renderDialog(container);
     await flush();
     act(() => container.querySelector<HTMLElement>('[data-slot="new-issue-compact-control"]')!.click());

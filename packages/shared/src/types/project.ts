@@ -145,6 +145,8 @@ export interface Project {
   privacyOwnerUserId?: string | null;
   status: ProjectStatus;
   leadAgentId: string | null;
+  /** Tasks a board user creates here go to this agent in Backlog to be investigated. Omitted by older servers. */
+  intakeAgentId?: string | null;
   targetDate: string | null;
   color: string | null;
   icon: string | null;
