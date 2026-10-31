@@ -55,12 +55,15 @@ pnpm paperclipai company import ./doc/solo-cto/company --target new --new-compan
 
 | Agent | Claude permission profile | Can change code? |
 |---|---|---|
+| Investigator | `toolProfile: read_only` (+ WebSearch/WebFetch) | No |
 | Tech Lead | `toolProfile: read_only` | No |
 | Product Lead | `toolProfile: read_only` (+ WebSearch/WebFetch) | No |
+| Security Officer | `toolProfile: read_only` (+ WebSearch/WebFetch) | No |
+| Legal Officer | `toolProfile: read_only` (+ WebSearch/WebFetch) | No |
 | Planner | `toolProfile: read_only` | No |
 | Implementer | `claudePermissionMode: auto`, git worktree | Only after plan approval |
 
-All three agents use `engine: cli` and `requireSubscriptionAuth: true`.
+All agents use `engine: cli` and `requireSubscriptionAuth: true`.
 
 **Read-only profile.** The read-only profile works as follows:
 
@@ -224,26 +227,46 @@ Only board users can change a project's plan approval policy; agents get
 
 ## 5. Run a task end to end
 
-**A. Create the task.** Create it in the gated project with a title and
-description, for example "Add passwordless login using email magic links".
+**A. Create the task.** Create it in the gated project; one sentence is
+enough, for example "Let event owners run polls in the chat". With the
+project's **intake agent** set to the Investigator (project settings, "Intake"),
+the task is created **in Backlog, assigned to the Investigator**, which is
+woken at once. The New Task dialog preselects the Investigator and says so;
+picking another assignee skips intake.
 
-**A2. Spec (product tasks only).** For a product feature, assign the task to
-the **Product Lead** first:
+**A2. Investigation.** The Investigator, read-only:
 
-- It writes a `spec` document: user problem, target users, user flow,
-  success metric, product acceptance criteria, and what's out of scope.
-- It asks you to approve the spec. Reject with feedback to get a revision.
-- Once approved, it hands the task to the Planner in planning mode. If it
-  can't reassign, it asks you to.
+- writes an `investigation` document: the request restated, who it's for,
+  what exists today, a challenge from the business, product, tech, security
+  and legal angles, alternatives, scope, acceptance criteria, size, and a
+  recommendation (Go, Rethink or Drop);
+- asks the **Product Lead** (user-facing or business questions) and/or the
+  **Tech Lead** (architecture, approach) for a review where relevant; they
+  write `product-review` and `tech-review` documents on the task;
+- asks you its open questions on one card;
+- rewrites the title and description (your original text stays under
+  "Original request"), tags the task, and **parks it in Backlog, assigned to
+  the Planner**.
 
-Spec approval is a review step, not a backend gate. The plan gate below is
-what blocks code.
+Read the investigation, then either **drag the card to Todo** to start
+planning, or cancel it. Leaving Backlog wakes the Planner.
 
-Technical tasks go straight to the Planner.
+Reviews use child "Review: …" tasks that block the reviewed task; the
+requester is woken when they are done. They show on the board briefly, then
+sit in Done.
 
-**B. Plan.** Assign the task to the **Planner**. The run is read-only:
+The Product Lead writes a `spec` only when you assign a task to it directly;
+it then asks you to approve the spec and hands the task to the Planner.
 
-- The Planner inspects the repo and writes the task's `plan` document.
+**B. Plan.** The **Planner** starts when the task moves to Todo (or when you
+assign it to the Planner yourself). The run is read-only:
+
+- The Planner inspects the repo and writes the task's `plan` document, using
+  the investigation and reviews.
+- If the task is tagged Security or Legal, or the plan touches personal data,
+  auth, payments, secrets or exposed infrastructure, it asks the **Security
+  Officer** and/or the **Legal Officer** to review the plan first
+  (`security-review`, `legal-review` documents) and revises the plan.
 - It creates an approval request for that plan revision and moves the task to
   `in_review`.
 - The task's **Plan approval** row shows *Awaiting approval (rev N)*.
@@ -311,26 +334,36 @@ Read the state with `GET /api/issues/:id/plan-approval`.
 
 ## 7. Scheduled task discovery
 
-Two daily routines create discovery tasks:
+Routines create discovery and audit tasks (Europe/Paris time):
 
-| Routine | Time (UTC) | Agent | Looks for |
+| Routine | When | Agent | Looks for |
 |---|---|---|---|
-| Daily technical discovery | 08:00 | Tech Lead | Bugs, tests, CI speed, DX, security, design and debt |
-| Daily product discovery | 09:00 | Product Lead | Friction in core flows (sign-up, onboarding, sharing), domain features, growth and retention loops, with web research |
+| Daily technical discovery | Daily 08:00 | Tech Lead | Bugs, tests, CI speed, DX, design and debt |
+| Daily product discovery | Daily 09:00 | Product Lead | Friction in core flows (sign-up, onboarding, sharing), domain features, growth and retention loops, with web research |
+| Weekly legal audit | Mon 10:00 | Legal Officer | GDPR, cookies and consent, terms, privacy policy, legal notices, retention, processors |
+| Weekly security audit | Tue 10:00 | Security Officer | CVEs, secrets, authn/authz, input handling, headers, rate limits, PII in logs, IaC |
+| Weekly code health | Wed 08:00 | Tech Lead | Dead code, duplication, needless complexity, inefficiency |
 
 How they behave:
 
 - Each proposes at most three tasks in a single `suggest_tasks` card, with
-  evidence, acceptance criteria and a score.
-- Each says so instead if nothing is worth proposing.
+  evidence, acceptance criteria, a score and tags.
+- The daily ones say so if nothing is worth proposing. The weekly ones
+  propose **zero to three**: with nothing to fix they post one line and
+  close, with no card.
 - They dedupe against open tasks and each other's suggestions.
-- Only the suggestions you accept become tasks. Each one gets its own
-  worktree and branch on its first run.
-- Once you accept, the Tech Lead assigns its tasks to the Planner (a task that
-  must wait for another is assigned `blocked` by it), and the Product Lead
-  takes its tasks to write their specs. Tasks you already assigned are left
-  alone.
+- Only the suggestions you accept become tasks. Each one gets its tags and its
+  own worktree and branch on its first run.
+- Once you accept, the author has the **other lead review** each task: a Tech
+  Lead feasibility review for Product Lead suggestions, a Product Lead impact
+  review for the others when they change user-facing behaviour. Then it parks
+  the task **in Backlog, assigned to the Planner**. Nothing starts until you
+  drag it to Todo. Tasks you already assigned are left alone.
 - Neither implements anything or assigns the Implementer.
+
+**Tags and swimlanes.** Agents tag tasks with the company labels Product,
+Tech, Security, Legal and Infra. Board cards show the tags; the board toolbar's
+rows button splits the board into one row of columns per tag.
 
 **Give the Product Lead context.** It works out the domain from the repo, then
 thinks as a product manager for that kind of user. For example, it looks at

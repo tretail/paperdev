@@ -226,11 +226,13 @@ pnpm paperclipai company import ./doc/solo-cto/company --target new --new-compan
 
 This creates:
 
-- the **Tech Lead**, **Product Lead**, **Planner** and **Implementer** agents (`claude_local`,
-  sandboxed, subscription only);
+- the **Investigator**, **Tech Lead**, **Product Lead**, **Security Officer**, **Legal
+  Officer**, **Planner** and **Implementer** agents (`claude_local`, sandboxed, subscription
+  only; all but the Implementer read-only);
 - the **App** project;
-- the **Daily technical discovery** (08:00 UTC) and **Daily product discovery**
-  (09:00 UTC) routines.
+- the routines, in Europe/Paris time: **Daily technical discovery** (08:00), **Daily
+  product discovery** (09:00), **Weekly legal audit** (Monday 10:00), **Weekly security
+  audit** (Tuesday 10:00) and **Weekly code health** (Wednesday 08:00).
 
 ### 7.2 Configure in the UI
 
@@ -240,6 +242,9 @@ This creates:
      `claude_sandbox_workspace_outside_root`.
    - **Plan approval**: turn it on, and set the implementer to
      **Implementer**.
+   - **Intake**: **Investigator**. Tasks you create then land in Backlog with the
+     Investigator, which challenges them and parks them for the Planner; dragging a card
+     to Todo starts planning.
    - **Execution workspaces**: isolated, git worktree from `main` (the
      package sets this). Without it every run shares the main checkout, and
      the Implementer would work on top of your uncommitted changes. It only
@@ -269,14 +274,19 @@ This creates:
    e.g. `[gh, aws, wrangler]`. It defaults to `[gh]`. The same editor holds
    `isolationRoot` and `allowedDomains`.
    - **Hide secret files** that sit inside the company folder, such as a repo
-     `.env`: add them to `claudeSandbox.extraDenyRead` on **all four** agents,
+     `.env`: add them to `claudeSandbox.extraDenyRead` on **all seven** agents,
      e.g. `[~/Workspaces/particups/.env]`. Both Bash and Claude's Read/Grep/Glob
      tools are then denied. Worktrees don't contain the untracked `.env`, so
      give the Implementer what its tests need through the project env or the
      worktree setup above.
-5. **Routines**: change the time or timezone of either discovery routine, or
-   pause it.
-6. **Product context**: copy `doc/solo-cto/product-context.template.md` to the
+5. **Labels** (any task → Labels → create): **Product** `#8250df`, **Tech** `#0969da`,
+   **Security** `#cf222e`, **Legal** `#bf8700`, **Infra** `#1a7f37`. Agents tag tasks with
+   these names; board cards show them, and the board toolbar's rows button splits the board
+   by tag.
+6. **Legal Officer → Instructions**: adjust its **Regimes** list for the company (for a
+   health product, add HDS and HIPAA).
+7. **Routines**: change the time or timezone of any routine, or pause it.
+8. **Product context**: copy `doc/solo-cto/product-context.template.md` to the
    product repo as `docs/product-context.md` and fill it in. The Product Lead
    reads it every run.
 

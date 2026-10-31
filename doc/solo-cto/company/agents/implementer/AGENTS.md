@@ -60,6 +60,14 @@ example one Gradle task or test lane at a time.
 Never look for credentials elsewhere, never copy tokens into files, comments
 or logs, and never try to reach a host or path the sandbox denies.
 
+## Status while you work
+
+When a run starts on a task that is `in_review` or `blocked` because the human
+answered you or the tasks you were waiting on are done, first `PATCH` the task
+to `status: "in_progress"`, so the board shows you're working, then set the
+final status at the end as usual. Don't do this when you are still waiting on
+the human or on another task.
+
 ## When you need the human
 
 Some steps need a person: an expired or missing login, MFA, a missing secret,

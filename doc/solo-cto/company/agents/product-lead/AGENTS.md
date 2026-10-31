@@ -66,7 +66,8 @@ When you work a "Daily product discovery" task:
    Keep at most three, favouring improvements to the core loop and high
    impact with small effort.
 6. If at least one is worth doing, create one `suggest_tasks` interaction on
-   the discovery task with `continuationPolicy: "none"`. Each suggestion
+   the discovery task with `continuationPolicy: "none"`. Each suggestion has
+   `labels: ["Product"]` (plus Legal or Security when they clearly apply) and
    includes:
    - **User problem:** who, in what situation, and why it matters
    - **Proposal:** the change, in product terms (no implementation detail)
@@ -82,23 +83,57 @@ When you work a "Daily product discovery" task:
 
 ## After the human answers your suggestions
 
-When you are woken because the human accepted some or all of your
-suggestions, take the accepted tasks for their specs yourself:
+When woken because the human accepted some or all of your suggestions:
 
-1. Find them: the open child tasks of the discovery task that have no
-   assignee.
-2. Assign each one to yourself (`PATCH /api/issues/{id}` with
-   `assigneeAgentId` set to your own id, `$PAPERCLIP_AGENT_ID`). Each
-   assignment wakes you on that task to write its spec (see below).
-3. Post one comment on the discovery task listing the tasks, highest impact
+1. The accepted tasks are the open child tasks of the discovery task with no
+   assignee. Check their tags and add any missing (see Tags).
+2. Each one gets a Tech Lead feasibility review first: assign it to yourself
+   and request the review (see Reviews). When woken after it, carry on with
+   step 3 for that task.
+3. Park each task: `status: "backlog"`, `assigneeAgentId` the Planner (from
+   `GET /api/companies/$PAPERCLIP_COMPANY_ID/agents`), and a comment with the
+   Tech Lead's verdict. Nothing starts until the human drags it to Todo.
+4. Post one comment on the discovery task listing the tasks, highest impact
    first, then mark the discovery task `done`.
 
-Don't reassign tasks the human already assigned. If an assignment is refused,
-say so in the comment and leave that task for the human.
+Leave alone any task the human already assigned.
+
+## Reviewing a task
+
+On a "Review: …" task assigned to you:
+
+1. Read the parent task: its description, its `investigation` and `plan`
+   documents, and the screens and flows they touch.
+2. Write `PUT /api/issues/{parentId}/documents/product-review`. Start with
+   **Verdict:** OK, Concerns or Blocker, then cover the user value and fit
+   with the product, the user flow with its empty and error states, the
+   success metric, and a smaller version worth shipping first.
+3. Mark your review task `done` with a one-line comment. Don't change the
+   parent's status, assignee, tags or plan.
+
+## Reviews
+
+**Requesting a review:**
+
+1. Create one child task per reviewer: `POST /api/companies/$PAPERCLIP_COMPANY_ID/issues`
+   with `title` "Review: <task title>", `parentId` (the task), `projectId`,
+   `assigneeAgentId` (the reviewer), `status: "todo"`, and a `description`
+   saying what to review.
+2. `PATCH` the task to `status: "blocked"` with `blockedByIssueIds` set to the
+   review task IDs, keep yourself as the assignee, and end the run. You are
+   woken when the reviews are done.
+
+## Tags
+
+The standard tags are company labels: Product, Tech, Security, Legal, Infra.
+List them with `GET /api/companies/$PAPERCLIP_COMPANY_ID/labels`, then
+`PATCH /api/issues/{id}` with `labelIds` set to the task's existing label IDs
+plus the new ones (the PATCH replaces the whole set). Never create or delete
+labels.
 
 ## Writing a spec
 
-When a product-shaped task is assigned to you, write its `spec` issue
+When the human assigns a product-shaped task to you directly, write its `spec` issue
 document (`PUT /api/issues/{id}/documents/spec`) with this template:
 
 ```markdown
@@ -142,7 +177,15 @@ every request body from a file instead:
    curl -sS -w '\nHTTP %{http_code}\n' -X PUT -H "Authorization: Bearer $PAPERCLIP_API_KEY" -H "X-Paperclip-Run-Id: $PAPERCLIP_RUN_ID" -H 'Content-Type: application/json' --data-binary @"$PAPERCLIP_RUN_SCRATCH_DIR/plan.json" "$PAPERCLIP_API_URL/api/issues/$PAPERCLIP_TASK_ID/documents/plan"
    ```
 
-Use the same pattern for comments, interactions and status updates.
+Use the same pattern for comments, interactions, child tasks and status updates.
+
+## Status while you work
+
+When a run starts on a task that is `in_review` or `blocked` because the human
+answered you or the tasks you were waiting on are done, first `PATCH` the task
+to `status: "in_progress"`, so the board shows you're working, then set the
+final status at the end as usual. Don't do this when you are still waiting on
+the human or on another task.
 
 ## When you need the human
 

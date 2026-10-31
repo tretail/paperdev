@@ -42,6 +42,48 @@ agents:
         claudeSandbox:
           enabled: true
           isolationRoot: ~/Workspaces
+  investigator:
+    adapter:
+      type: claude_local
+      # Keep the CLI adapter: sandbox, read-only mode and the plan gate are
+      # claude_local features. "auto" switches to the Paperclip Runner once it
+      # is built.
+      runner: legacy
+      config:
+        engine: cli
+        toolProfile: read_only
+        requireSubscriptionAuth: true
+        claudeSandbox:
+          enabled: true
+          isolationRoot: ~/Workspaces
+  legal-officer:
+    adapter:
+      type: claude_local
+      # Keep the CLI adapter: sandbox, read-only mode and the plan gate are
+      # claude_local features. "auto" switches to the Paperclip Runner once it
+      # is built.
+      runner: legacy
+      config:
+        engine: cli
+        toolProfile: read_only
+        requireSubscriptionAuth: true
+        claudeSandbox:
+          enabled: true
+          isolationRoot: ~/Workspaces
+  security-officer:
+    adapter:
+      type: claude_local
+      # Keep the CLI adapter: sandbox, read-only mode and the plan gate are
+      # claude_local features. "auto" switches to the Paperclip Runner once it
+      # is built.
+      runner: legacy
+      config:
+        engine: cli
+        toolProfile: read_only
+        requireSubscriptionAuth: true
+        claudeSandbox:
+          enabled: true
+          isolationRoot: ~/Workspaces
   implementer:
     adapter:
       type: claude_local
@@ -85,9 +127,26 @@ routines:
     triggers:
       - kind: schedule
         cronExpression: "0 8 * * *"
-        timezone: UTC
+        timezone: Europe/Paris
   daily-product-discovery:
     triggers:
       - kind: schedule
         cronExpression: "0 9 * * *"
-        timezone: UTC
+        timezone: Europe/Paris
+  # Weekly audits propose zero to three tasks; with nothing to report they
+  # post one line and close, with no suggestion card.
+  weekly-legal-audit:
+    triggers:
+      - kind: schedule
+        cronExpression: "0 10 * * 1"
+        timezone: Europe/Paris
+  weekly-security-audit:
+    triggers:
+      - kind: schedule
+        cronExpression: "0 10 * * 2"
+        timezone: Europe/Paris
+  weekly-code-health:
+    triggers:
+      - kind: schedule
+        cronExpression: "0 8 * * 3"
+        timezone: Europe/Paris
