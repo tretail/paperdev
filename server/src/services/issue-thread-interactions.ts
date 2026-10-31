@@ -49,6 +49,7 @@ import {
   issueThreadInteractions,
   issueThreadInteractionIdempotencyKeys,
   issues,
+  labels,
   toolActionRequests,
   toolOauthStates,
 } from "@paperclipai/db";
@@ -4280,7 +4281,16 @@ export function issueThreadInteractionService(
           throw interactionAlreadyResolvedError();
         }
 
+        // Suggested tags apply when they name one of the company's labels; others are ignored.
+        const labelIdsByName = orderedTasks.some((task) => task.labels?.length)
+          ? new Map((await tx.select({ id: labels.id, name: labels.name }).from(labels)
+              .where(eq(labels.companyId, issue.companyId)))
+              .map((label) => [label.name.trim().toLowerCase(), label.id]))
+          : new Map<string, string>();
+
         for (const task of orderedTasks) {
+          const suggestedLabelIds = [...new Set((task.labels ?? [])
+            .flatMap((name) => labelIdsByName.get(name.trim().toLowerCase()) ?? []))];
           const proposedParentId = task.parentClientKey
             ? (createdByClientKey.get(task.parentClientKey)?.issueId ?? null)
             : (task.parentId ??
@@ -4305,6 +4315,7 @@ export function issueThreadInteractionService(
             projectId: task.projectId ?? issue.projectId,
             goalId: task.goalId ?? issue.goalId,
             billingCode: task.billingCode ?? null,
+            ...(suggestedLabelIds.length > 0 ? { labelIds: suggestedLabelIds } : {}),
             createdByAgentId: actor.agentId ?? null,
             createdByUserId: actor.userId ?? null,
             originIdentityContextId: interaction.sourceIdentityContextId ?? null,

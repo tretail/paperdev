@@ -23,7 +23,9 @@ import {
   instanceSettings,
   issueRelations,
   issueThreadInteractions,
+  issueLabels,
   issues,
+  labels,
   projectWorkspaces,
   projects,
   workspaceOperations,
@@ -66,6 +68,8 @@ describeEmbeddedPostgres("issueThreadInteractionService", () => {
     await db.delete(documentRevisions);
     await db.delete(documents);
     await db.delete(issueRelations);
+    await db.delete(issueLabels);
+    await db.delete(labels);
     await db.delete(heartbeatRuns);
     await db.delete(workspaceOperations);
     await db.delete(issues);
@@ -4677,6 +4681,31 @@ describeEmbeddedPostgres("issueThreadInteractionService", () => {
       const children = await db.select().from(issues).where(eq(issues.parentId, issueId));
       expect(children).toHaveLength(2);
       for (const child of children) expect(child.executionWorkspaceId).toBeNull();
+    });
+
+    it("tags accepted suggestions with the company labels they name", async () => {
+      const { companyId, issueId, goalId } = await seedAcceptGateFixture();
+      const [security] = await db.insert(labels).values({ companyId, name: "Security", color: "#cf222e" }).returning();
+      const created = await interactionsSvc.create({ id: issueId, companyId }, {
+        kind: "suggest_tasks",
+        continuationPolicy: "wake_assignee",
+        payload: {
+          version: 1,
+          tasks: [
+            { clientKey: "tagged", title: "Rotate the webhook secret", labels: ["security", "Unknown tag"] },
+            { clientKey: "plain", title: "No tags" },
+          ],
+        },
+      }, { userId: "local-board" });
+
+      await interactionsSvc.acceptInteraction(acceptIssueScope(issueId, companyId, goalId), created.id, {}, { userId: "local-board" });
+
+      const children = await db.select({ id: issues.id, title: issues.title }).from(issues).where(eq(issues.parentId, issueId));
+      const tagged = children.find((child) => child.title === "Rotate the webhook secret")!;
+      const plain = children.find((child) => child.title === "No tags")!;
+      expect((await db.select({ labelId: issueLabels.labelId }).from(issueLabels).where(eq(issueLabels.issueId, tagged.id)))
+        .map((row) => row.labelId)).toEqual([security!.id]);
+      expect(await db.select().from(issueLabels).where(eq(issueLabels.issueId, plain.id))).toEqual([]);
     });
 
     it("allows accept when the issue has no execution workspace attached", async () => {
