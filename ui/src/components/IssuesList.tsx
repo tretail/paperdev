@@ -76,7 +76,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import { CircleDot, Plus, ArrowUpDown, Layers, Check, ChevronRight, List, ListTree, User, Search, CircleSlash2, ChevronsDownUp, PanelTopClose, RotateCcw, ListCollapse,
+import { CircleDot, Plus, ArrowUpDown, Layers, Check, ChevronRight, List, ListTree, User, Search, CircleSlash2, ChevronsDownUp, PanelTopClose, RotateCcw, ListCollapse, Rows3,
   SquareKanban,
 } from "lucide-react";
 import {
@@ -163,6 +163,7 @@ export type IssueSortField = "status" | "priority" | "title" | "created" | "upda
 export type BoardCardDensity = "auto" | "compact" | "comfortable";
 export type BoardColdLaneMode = "auto" | "collapsed" | "expanded";
 export type BoardColumnPageSize = KanbanColumnPageSize;
+export type BoardSwimlanes = "none" | "label";
 
 export type IssueViewState = IssueFilterState & {
   sortField: IssueSortField;
@@ -176,6 +177,7 @@ export type IssueViewState = IssueFilterState & {
   boardCardDensity: BoardCardDensity;
   boardColdLaneMode: BoardColdLaneMode;
   boardColumnPageSize: BoardColumnPageSize;
+  boardSwimlanes: BoardSwimlanes;
 };
 
 const defaultViewState: IssueViewState = {
@@ -191,6 +193,7 @@ const defaultViewState: IssueViewState = {
   boardCardDensity: "auto",
   boardColdLaneMode: "expanded",
   boardColumnPageSize: KANBAN_COLUMN_DEFAULT_PAGE_SIZE,
+  boardSwimlanes: "none",
 };
 
 function normalizeBoardCardDensity(value: unknown): BoardCardDensity {
@@ -235,6 +238,7 @@ function normalizeIssueViewState(value: unknown): IssueViewState {
     boardCardDensity: normalizeBoardCardDensity(parsed.boardCardDensity),
     boardColdLaneMode: normalizeBoardColdLaneMode(parsed.boardColdLaneMode),
     boardColumnPageSize: normalizeBoardColumnPageSize(parsed.boardColumnPageSize),
+    boardSwimlanes: parsed.boardSwimlanes === "label" ? "label" : "none",
   };
 }
 
@@ -1889,6 +1893,17 @@ function StreamlinedIssuesList({
               >
                 <PanelTopClose className="h-3.5 w-3.5" />
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className={cn("h-8 w-8 shrink-0", viewState.boardSwimlanes === "label" && "bg-accent")}
+                onClick={() => updateView({ boardSwimlanes: viewState.boardSwimlanes === "label" ? "none" : "label" })}
+                title={viewState.boardSwimlanes === "label" ? "Show one board" : "Split the board into rows by tag"}
+                aria-pressed={viewState.boardSwimlanes === "label"}
+              >
+                <Rows3 className="h-3.5 w-3.5" />
+              </Button>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -2098,6 +2113,7 @@ function StreamlinedIssuesList({
           collapsedStatuses={boardCollapsedStatuses}
           initialVisibleCount={viewState.boardColumnPageSize}
           revealIncrement={viewState.boardColumnPageSize}
+          swimlanes={viewState.boardSwimlanes}
           onUpdateIssue={onUpdateIssue}
         />
       ) : (

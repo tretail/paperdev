@@ -22,6 +22,7 @@ import { timeAgo } from "../lib/timeAgo";
 import { Identity } from "./Identity";
 import { StatusIcon } from "./StatusIcon";
 import { Badge } from "@/components/ui/badge";
+import { IssueLabelChips } from "./IssueLabelChip";
 
 export const issueTrailingColumns: InboxIssueColumn[] = ["assignee", "kickedOffBy", "project", "workspace", "parent", "labels", "updated"];
 
@@ -430,28 +431,7 @@ export function InboxIssueTrailingColumns({
 
         if (column === "labels") {
           if ((issue.labels ?? []).length > 0) {
-            return (
-              <span key={column} className="flex min-w-0 items-center gap-1 overflow-hidden">
-                {(issue.labels ?? []).slice(0, 2).map((label) => (
-                  <Badge variant="outline"
-                    key={label.id}
-                    className="min-w-0 max-w-full px-1.5 py-0 text-(length:--text-nano)"
-                    style={{
-                      borderColor: label.color,
-                      color: pickTextColorForPillBg(label.color, 0.12),
-                      backgroundColor: `${label.color}1f`,
-                    }}
-                  >
-                    <span className="truncate">{label.name}</span>
-                  </Badge>
-                ))}
-                {(issue.labels ?? []).length > 2 ? (
-                  <span className="shrink-0 text-(length:--text-nano) font-medium text-muted-foreground">
-                    +{(issue.labels ?? []).length - 2}
-                  </span>
-                ) : null}
-              </span>
-            );
+            return <IssueLabelChips key={column} labels={issue.labels ?? []} max={2} />;
           }
 
           return <span key={column} className="min-w-0" aria-hidden="true" />;

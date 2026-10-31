@@ -22,12 +22,13 @@ import { useQuery } from "@tanstack/react-query";
 import { StatusIcon } from "./StatusIcon";
 import { PriorityIcon } from "./PriorityIcon";
 import { PullRequestStateIcon } from "./PullRequestStateIcon";
+import { IssueLabelChip, IssueLabelChips } from "./IssueLabelChip";
 import { SHOW_TASK_PRIORITY_UI } from "../lib/ui-flags";
 import { Identity } from "./Identity";
-import type { Issue, IssuePullRequestSummary, IssueStatus } from "@paperclipai/shared";
+import type { Issue, IssueLabel, IssuePullRequestSummary, IssueStatus } from "@paperclipai/shared";
 import { issuesApi } from "../api/issues";
 import { queryKeys } from "../lib/queryKeys";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
 import { isSuccessfulRunHandoffRequired } from "../lib/successful-run-handoff";
 import { collectSubtreeLiveCounts } from "../lib/liveIssueIds";
 import { cn } from "../lib/utils";
@@ -143,10 +144,53 @@ function statusLabel(status: string): string {
 }
 
 export function resolveKanbanTargetStatus(overId: string, issues: Issue[]): IssueStatus | null {
-  if ((boardStatuses as readonly string[]).includes(overId)) {
-    return overId as IssueStatus;
+  // Swimlane columns are droppable as "<lane>::<status>"; a drop only ever changes status.
+  const separator = overId.lastIndexOf(KANBAN_LANE_SEPARATOR);
+  const columnId = separator === -1 ? overId : overId.slice(separator + KANBAN_LANE_SEPARATOR.length);
+  if ((boardStatuses as readonly string[]).includes(columnId)) {
+    return columnId as IssueStatus;
   }
   return issues.find((issue) => issue.id === overId)?.status ?? null;
+}
+
+/* ── Tag swimlanes ── */
+
+/** Tag lanes come in this order, then any other labels A–Z, then the untagged lane. */
+export const KANBAN_LANE_LABEL_ORDER = ["security", "legal", "product", "tech", "infra"] as const;
+export const KANBAN_UNTAGGED_LANE = "__untagged__";
+const KANBAN_LANE_SEPARATOR = "::";
+
+type LaneLabel = Pick<IssueLabel, "id" | "name" | "color">;
+
+export interface KanbanLane {
+  key: string;
+  label: LaneLabel | null;
+  issues: Issue[];
+}
+
+function laneRank(label: LaneLabel): number {
+  const index = (KANBAN_LANE_LABEL_ORDER as readonly string[]).indexOf(label.name.trim().toLowerCase());
+  return index === -1 ? KANBAN_LANE_LABEL_ORDER.length : index;
+}
+
+function compareLaneLabels(a: LaneLabel, b: LaneLabel): number {
+  return laneRank(a) - laneRank(b) || a.name.localeCompare(b.name);
+}
+
+/** One lane per tag; each issue appears once, in the lane of its first label in lane order. */
+export function groupKanbanLanes(issues: Issue[]): KanbanLane[] {
+  const lanes = new Map<string, KanbanLane>();
+  for (const issue of issues) {
+    const label = [...(issue.labels ?? [])].sort(compareLaneLabels)[0] ?? null;
+    const key = label ? label.id : KANBAN_UNTAGGED_LANE;
+    const lane = lanes.get(key) ?? { key, label, issues: [] };
+    lane.issues.push(issue);
+    lanes.set(key, lane);
+  }
+  return [...lanes.values()].sort((a, b) => {
+    if (a.label && b.label) return compareLaneLabels(a.label, b.label);
+    return a.label ? -1 : b.label ? 1 : 0;
+  });
 }
 
 interface Agent {
@@ -164,6 +208,8 @@ interface KanbanBoardProps {
   revealIncrement?: number;
   /** Proposed clipping indicators, with a single horizontal scroll owner. */
   showOverflowFades?: boolean;
+  /** "label" splits the board into one row of columns per tag. */
+  swimlanes?: "none" | "label";
   onUpdateIssue: (id: string, data: Record<string, unknown>) => void;
 }
 
@@ -171,6 +217,7 @@ interface KanbanBoardProps {
 
 function KanbanColumn({
   status,
+  droppableId,
   issues,
   agents,
   liveIssueIds,
@@ -183,6 +230,8 @@ function KanbanColumn({
   onShowMore,
 }: {
   status: IssueStatus;
+  /** Defaults to the status; swimlane columns use "<lane>::<status>". */
+  droppableId?: string;
   issues: Issue[];
   agents?: Agent[];
   liveIssueIds?: Set<string>;
@@ -194,7 +243,7 @@ function KanbanColumn({
   revealIncrement: number;
   onShowMore: () => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: status });
+  const { setNodeRef, isOver } = useDroppable({ id: droppableId ?? status });
 
   const isEmpty = issues.length === 0;
   const visibleIssues = collapsed ? [] : issues.slice(0, visibleCount);
@@ -403,6 +452,7 @@ function KanbanCard({
           )}
         </div>
         <p className={`${compact ? "mb-1.5 text-xs" : "mb-2 text-sm"} leading-snug line-clamp-2`}>{issue.title}</p>
+        <IssueLabelChips labels={issue.labels ?? []} max={3} className={compact ? "mb-1.5" : "mb-2"} />
         {/* Room for the pull request button, which sits outside the task link. */}
         <div className={cn("flex items-center gap-2 min-w-0", pullRequest && "pr-16")}>
           {/* PAP-411: priority UI hidden behind SHOW_TASK_PRIORITY_UI. */}
@@ -424,6 +474,12 @@ function KanbanCard({
   );
 }
 
+function groupIssuesByStatus(issues: Issue[]): Record<IssueStatus, Issue[]> {
+  const grouped = Object.fromEntries(boardStatuses.map((status) => [status, [] as Issue[]])) as Record<IssueStatus, Issue[]>;
+  for (const issue of issues) grouped[issue.status]?.push(issue);
+  return grouped;
+}
+
 /* ── Main Board ── */
 
 export function KanbanBoard({
@@ -435,9 +491,11 @@ export function KanbanBoard({
   initialVisibleCount = KANBAN_COLUMN_INITIAL_VISIBLE_LIMIT,
   revealIncrement = KANBAN_COLUMN_REVEAL_INCREMENT,
   showOverflowFades = false,
+  swimlanes = "none",
   onUpdateIssue,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [collapsedLanes, setCollapsedLanes] = useState<ReadonlySet<string>>(() => new Set());
   const paginationKey = `${initialVisibleCount}:${revealIncrement}`;
   const [visibleState, setVisibleState] = useState<{
     paginationKey: string;
@@ -450,18 +508,7 @@ export function KanbanBoard({
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
-  const columnIssues = useMemo(() => {
-    const grouped: Record<IssueStatus, Issue[]> = {} as Record<IssueStatus, Issue[]>;
-    for (const status of boardStatuses) {
-      grouped[status] = [];
-    }
-    for (const issue of issues) {
-      if (grouped[issue.status]) {
-        grouped[issue.status].push(issue);
-      }
-    }
-    return grouped;
-  }, [issues]);
+  const lanes = useMemo(() => (swimlanes === "label" ? groupKanbanLanes(issues) : null), [issues, swimlanes]);
 
   const activeIssue = useMemo(
     () => (activeId ? issues.find((i) => i.id === activeId) : null),
@@ -513,28 +560,67 @@ export function KanbanBoard({
     // Could be used for visual feedback; keeping simple for now
   }
 
-  const columns = boardStatuses.map((status) => (
-    <KanbanColumn
-      key={status}
-      status={status}
-      issues={columnIssues[status] ?? []}
-      agents={agents}
-      liveIssueIds={liveIssueIds}
-      subtreeLiveCounts={subtreeLiveCounts}
-      pullRequests={pullRequests}
-      compactCards={compactCards}
-      // Compact mode also collapses empty lanes to labeled rails.
-      collapsed={collapsedStatusSet.has(status) || (collapsedStatusSet.size > 0 && columnIssues[status].length === 0)}
-      visibleCount={visibleCountByStatus[status] ?? initialVisibleCount}
-      revealIncrement={revealIncrement}
-      onShowMore={() => {
-        setVisibleState((current) => {
-          const counts = current.paginationKey === paginationKey ? current.counts : {};
-          return { paginationKey, counts: { ...counts, [status]: (counts[status] ?? initialVisibleCount) + revealIncrement } };
-        });
-      }}
-    />
-  ));
+  /** One column per status for `laneIssues`; inside a swimlane, ids and page counts are per lane. */
+  function renderColumns(laneIssues: Issue[], laneKey: string | null) {
+    const byStatus = groupIssuesByStatus(laneIssues);
+    return boardStatuses.map((status) => {
+      const columnKey = laneKey ? `${laneKey}${KANBAN_LANE_SEPARATOR}${status}` : status;
+      return (
+        <KanbanColumn
+          key={columnKey}
+          status={status}
+          droppableId={columnKey}
+          issues={byStatus[status]}
+          agents={agents}
+          liveIssueIds={liveIssueIds}
+          subtreeLiveCounts={subtreeLiveCounts}
+          pullRequests={pullRequests}
+          compactCards={compactCards}
+          // Compact mode also collapses empty lanes to labeled rails.
+          collapsed={collapsedStatusSet.has(status) || (collapsedStatusSet.size > 0 && byStatus[status].length === 0)}
+          visibleCount={visibleCountByStatus[columnKey] ?? initialVisibleCount}
+          revealIncrement={revealIncrement}
+          onShowMore={() => {
+            setVisibleState((current) => {
+              const counts = current.paginationKey === paginationKey ? current.counts : {};
+              return { paginationKey, counts: { ...counts, [columnKey]: (counts[columnKey] ?? initialVisibleCount) + revealIncrement } };
+            });
+          }}
+        />
+      );
+    });
+  }
+
+  function toggleLane(key: string) {
+    setCollapsedLanes((current) => {
+      const next = new Set(current);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  }
+
+  const content = lanes
+    ? lanes.map((lane) => {
+        const collapsed = collapsedLanes.has(lane.key);
+        const name = lane.label?.name ?? "No tag";
+        return (
+          <section key={lane.key} aria-label={`${name} lane`} className="flex flex-col gap-1">
+            <button
+              type="button"
+              className="flex w-fit items-center gap-2 rounded-md px-1 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+              aria-expanded={!collapsed}
+              onClick={() => toggleLane(lane.key)}
+            >
+              {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              {lane.label ? <IssueLabelChip label={lane.label} /> : <span>{name}</span>}
+              <span className="tabular-nums">{lane.issues.length}</span>
+            </button>
+            {collapsed ? null : <div className="flex gap-3">{renderColumns(lane.issues, lane.key)}</div>}
+          </section>
+        );
+      })
+    : renderColumns(issues, null);
+  const contentLayout = lanes ? "flex flex-col gap-4" : "flex gap-3";
 
   return (
     <DndContext
@@ -544,8 +630,8 @@ export function KanbanBoard({
       onDragEnd={handleDragEnd}
     >
       {showOverflowFades
-        ? <HorizontalScrollViewport label="Task board columns" contentClassName="flex gap-3 pb-4 px-2">{columns}</HorizontalScrollViewport>
-        : <div className="flex gap-3 overflow-x-auto pb-4 -mx-2 px-2">{columns}</div>}
+        ? <HorizontalScrollViewport label="Task board columns" contentClassName={cn(contentLayout, "pb-4 px-2")}>{content}</HorizontalScrollViewport>
+        : <div className={cn(contentLayout, "overflow-x-auto pb-4 -mx-2 px-2")}>{content}</div>}
       <DragOverlay>
         {activeIssue ? (
           <KanbanCard issue={activeIssue} agents={agents} pullRequest={pullRequests.get(activeIssue.id)} isOverlay compact={compactCards} />

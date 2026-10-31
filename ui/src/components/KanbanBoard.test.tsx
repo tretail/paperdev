@@ -5,7 +5,7 @@ import { flushSync } from "react-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Issue, IssuePullRequestSummary, IssueStatus } from "@paperclipai/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getKanbanColumnTone, KanbanBoard, resolveKanbanTargetStatus } from "./KanbanBoard";
+import { getKanbanColumnTone, groupKanbanLanes, KanbanBoard, KANBAN_UNTAGGED_LANE, resolveKanbanTargetStatus } from "./KanbanBoard";
 
 const pullRequestsMock = vi.hoisted(() => ({ summaries: [] as IssuePullRequestSummary[] }));
 
@@ -271,5 +271,55 @@ describe("KanbanBoard", () => {
     expect(link.parentElement?.closest("a")).toBeNull();
     // Only the card with a pull request gets a button.
     expect(container.querySelectorAll('a[href^="https://github.com"]')).toHaveLength(1);
+  });
+
+  describe("tag swimlanes", () => {
+    const label = (name: string, color = "var(--label-test)") => ({
+      id: `label-${name.toLowerCase()}`, companyId: "company-1", name, color,
+      createdAt: new Date("2026-05-05T00:00:00.000Z"), updatedAt: new Date("2026-05-05T00:00:00.000Z"),
+    });
+    const tagged = (index: number, status: IssueStatus, labels: ReturnType<typeof label>[]): Issue => ({
+      ...createIssue(index, status), labels, labelIds: labels.map((entry) => entry.id),
+    });
+
+    it("puts each task once, in the lane of its first tag in lane order", () => {
+      const lanes = groupKanbanLanes([
+        tagged(1, "todo", [label("Tech"), label("Security")]),
+        tagged(2, "done", [label("Zeta")]),
+        tagged(3, "todo", [label("product")]),
+        tagged(4, "backlog", []),
+        tagged(5, "todo", [label("Alpha"), label("Zeta")]),
+      ]);
+      expect(lanes.map((lane) => lane.label?.name ?? lane.key)).toEqual(["Security", "product", "Alpha", "Zeta", KANBAN_UNTAGGED_LANE]);
+      expect(lanes.map((lane) => lane.issues.map((issue) => issue.identifier))).toEqual([["PAP-1"], ["PAP-3"], ["PAP-5"], ["PAP-2"], ["PAP-4"]]);
+    });
+
+    it("maps a drop on a lane column to that column's status only", () => {
+      const issues = [tagged(1, "todo", [label("Tech")])];
+      expect(resolveKanbanTargetStatus("label-security::done", issues)).toBe("done");
+      expect(resolveKanbanTargetStatus(`${KANBAN_UNTAGGED_LANE}::in_review`, issues)).toBe("in_review");
+      expect(resolveKanbanTargetStatus("issue-todo-1", issues)).toBe("todo");
+      expect(resolveKanbanTargetStatus("label-security::nope", issues)).toBeNull();
+    });
+
+    it("renders a lane per tag with its chip and count, and tag chips on cards", () => {
+      const { container } = renderBoard({
+        swimlanes: "label",
+        issues: [tagged(1, "todo", [label("Security", "var(--label-security-test)"), label("Tech")]), tagged(2, "done", [])],
+      });
+      const lanes = [...container.querySelectorAll("section[aria-label]")].map((lane) => lane.getAttribute("aria-label"));
+      expect(lanes).toEqual(["Security lane", "No tag lane"]);
+      const card = container.querySelector('a[href="/issues/PAP-1"]')!;
+      expect(card.textContent).toContain("Security");
+      expect(card.textContent).toContain("Tech");
+    });
+
+    it("collapses a lane from its header", () => {
+      const { container } = renderBoard({ swimlanes: "label", issues: [tagged(1, "todo", [label("Legal")])] });
+      const header = container.querySelector<HTMLButtonElement>('section[aria-label="Legal lane"] button[aria-expanded]')!;
+      act(() => header.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+      expect(header.getAttribute("aria-expanded")).toBe("false");
+      expect(container.textContent).not.toContain("Issue 1");
+    });
   });
 });
