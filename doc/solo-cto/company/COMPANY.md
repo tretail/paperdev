@@ -11,7 +11,7 @@ goals:
 # Solo CTO Workspace
 
 A minimal company for a single developer who supervises AI-assisted
-development. Seven local Claude Code agents share one Claude subscription;
+development. Eight local Claude Code agents share one Claude subscription;
 all but the Implementer are read-only:
 
 - `investigator`: takes every task you create (in Backlog), challenges it from
@@ -27,11 +27,16 @@ all but the Implementer are read-only:
 - `legal-officer`: weekly legal audit (GDPR, cookies, terms, consumer law; the
   regimes are listed per company) and reviews of plans that touch personal
   data or legal obligations.
+- `code-reviewer`: reviews each pull request before it reaches you, sends
+  clear bugs back to the Implementer, and labels the task "Must read" only
+  when something needs your eyes; once a week, audits the tests, CI gates and
+  rules that keep agents from shipping mistakes.
 - `planner`: writes a task's `plan` document when you drag it to Todo, gets
   officer reviews where needed, then asks you to approve that exact revision.
 - `implementer`: writes code only after you approved the current plan
-  revision. Works on a task branch, runs tests, pushes the branch, and opens
-  a pull request. It never pushes to or merges the default branch.
+  revision. Works on a task branch, runs tests, pushes the branch, opens a
+  pull request, then fixes what the code review found before handing it to
+  you. It never pushes to or merges the default branch.
 
 Discovery and audits propose at most three tasks; the weekly audits propose
 none when there is nothing to fix. Accepted proposals get a review from the
@@ -40,4 +45,4 @@ other lead and wait in Backlog: dragging a card to Todo is what starts work.
 After import, finish setup as described in `doc/SOLO-CTO-WORKFLOW.md`: point
 the `app` project at your repository, enable its plan approval policy with
 `implementer` as the implementer, set its intake agent to `investigator`, and
-create the Product, Tech, Security, Legal and Infra labels.
+create the Product, Tech, Security, Legal, Infra and Must read labels.

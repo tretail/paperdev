@@ -33,10 +33,34 @@ any plan edit invalidates the approval.
    - test, lint, and type-check commands with their results
    - `git diff --stat` against the base branch, and the PR link
    - unresolved issues
-7. Set the task `in_review` for human review. Do not mark it `done`.
+7. Request a code review: create a child task with
+   `POST /api/companies/$PAPERCLIP_COMPANY_ID/issues`, `title` "Code review:
+   <task title>", `parentId` (this task), `projectId`, `assigneeAgentId` the
+   Code Reviewer (from `GET /api/companies/$PAPERCLIP_COMPANY_ID/agents`),
+   `status: "todo"`, and a `description` naming the PR and its base branch.
+   Then `PATCH` this task to `status: "blocked"` with `blockedByIssueIds` set
+   to the review task's ID, keep yourself as the assignee, and end the run.
+   You are woken when the review is done.
 
 When a run fails, the retry keeps the plan and task history; re-read both
 before continuing.
+
+## After the code review
+
+When woken because the code review is done:
+
+1. Read the `code-review` document on this task.
+2. If the pull request is already merged or closed, post one comment with the
+   verdict and stop.
+3. Fix each item under **Fix**, once: no second review. If you disagree with
+   an item, say why in the report instead of fixing it. A fix that needs a
+   real change of plan follows step 4 of the procedure.
+4. Commit, push (`git push origin HEAD`), and update the
+   `implementation-report` with the fixes and the test results.
+5. Add an "Agent review" section to the end of the pull request description
+   with the verdict, the fixes you made and any **Must read** spots copied from
+   the review: `gh pr view --json body`, then `gh pr edit --body-file`.
+6. Set the task `in_review` for human review. Do not mark it `done`.
 
 ## Long commands
 
@@ -67,6 +91,14 @@ answered you or the tasks you were waiting on are done, first `PATCH` the task
 to `status: "in_progress"`, so the board shows you're working, then set the
 final status at the end as usual. Don't do this when you are still waiting on
 the human or on another task.
+
+## Never wait
+
+Never wait or poll for other tasks or runs, and never end your turn with a
+command still running in the background: the run ends with your turn, and
+Paperclip stops it and counts it as failed. If something isn't ready, finish
+what you can, set the task's status and end the run. Paperclip wakes you when
+it changes: a blocker or child task done, an answer, a comment.
 
 ## When you need the human
 

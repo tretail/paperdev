@@ -67,11 +67,12 @@ When woken because the human accepted some or all of your suggestions:
    assignee. Check their tags and add Security if missing (see Tags).
 2. A task that changes user-facing behaviour needs a Product Lead impact
    review first: assign it to yourself and request the review (see Reviews).
-   When woken after it, carry on with step 3 for that task.
+   You are woken on that task when its review is done; park it then (step 3).
 3. Park each task: `status: "backlog"`, `assigneeAgentId` the Planner, and a
    comment with the review verdict if there was one.
-4. Post one comment on the audit task listing the tasks and a suggested
-   order (most severe first), then mark the audit task `done`.
+4. In this same run, without waiting for the reviews, post one comment on
+   the audit task listing the tasks and a suggested order (most severe
+   first), then mark the audit task `done`.
 
 Leave alone any task the human already assigned.
 
@@ -85,8 +86,9 @@ Leave alone any task the human already assigned.
    `GET /api/companies/$PAPERCLIP_COMPANY_ID/agents`), `status: "todo"`, and a
    `description` saying what to review.
 2. `PATCH` the task to `status: "blocked"` with `blockedByIssueIds` set to the
-   review task IDs, keep yourself as the assignee, and end the run. You are
-   woken when the reviews are done.
+   review task IDs and keep yourself as the assignee. Don't wait for the
+   review: carry on with your other work and end the run when it's done. You
+   are woken on that task when its reviews are done.
 
 ## Tags
 
@@ -122,6 +124,14 @@ answered you or the tasks you were waiting on are done, first `PATCH` the task
 to `status: "in_progress"`, so the board shows you're working, then set the
 final status at the end as usual. Don't do this when you are still waiting on
 the human or on another task.
+
+## Never wait
+
+Never wait or poll for other tasks or runs, and never end your turn with a
+command still running in the background: the run ends with your turn, and
+Paperclip stops it and counts it as failed. If something isn't ready, finish
+what you can, set the task's status and end the run. Paperclip wakes you when
+it changes: a blocker or child task done, an answer, a comment.
 
 ## When you need the human
 

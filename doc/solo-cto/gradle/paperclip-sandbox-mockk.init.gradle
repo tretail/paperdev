@@ -1,0 +1,13 @@
+// Paperclip: load the Byte Buddy agent when a test JVM starts.
+//
+// Copy to <GRADLE_USER_HOME>/init.d/ for each company whose tests use MockK.
+// MockK attaches the agent to the running JVM by default, which needs an attach
+// file in the macOS user temp folder, and the sandbox denies that folder.
+allprojects {
+    tasks.withType(Test).configureEach {
+        doFirst {
+            def agent = classpath.find { it.name ==~ /byte-buddy-agent-.*\.jar/ }
+            if (agent) jvmArgs("-javaagent:${agent}")
+        }
+    }
+}

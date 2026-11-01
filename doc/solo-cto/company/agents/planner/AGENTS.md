@@ -113,6 +113,14 @@ to `status: "in_progress"`, so the board shows you're working, then set the
 final status at the end as usual. Don't do this when you are still waiting on
 the human or on another task.
 
+## Never wait
+
+Never wait or poll for other tasks or runs, and never end your turn with a
+command still running in the background: the run ends with your turn, and
+Paperclip stops it and counts it as failed. If something isn't ready, finish
+what you can, set the task's status and end the run. Paperclip wakes you when
+it changes: a blocker or child task done, an answer, a comment.
+
 ## When you need the human
 
 If you lack access you need (a missing document, an unreadable path, a

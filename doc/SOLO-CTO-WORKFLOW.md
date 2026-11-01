@@ -60,6 +60,7 @@ pnpm paperclipai company import ./doc/solo-cto/company --target new --new-compan
 | Product Lead | `toolProfile: read_only` (+ WebSearch/WebFetch) | No |
 | Security Officer | `toolProfile: read_only` (+ WebSearch/WebFetch) | No |
 | Legal Officer | `toolProfile: read_only` (+ WebSearch/WebFetch) | No |
+| Code Reviewer | `toolProfile: read_only` | No |
 | Planner | `toolProfile: read_only` | No |
 | Implementer | `claudePermissionMode: auto`, git worktree | Only after plan approval |
 
@@ -105,6 +106,30 @@ GitHub for a hard guarantee (see Limitations).
 Agents that set none of them keep the legacy behaviour, which is
 `dangerouslySkipPermissions`, default true.
 
+### Company profiles
+
+The generic instructions in `doc/solo-cto/company` are the same for every company.
+A regulated product adds a profile from `doc/solo-cto/profiles/`:
+
+| Profile | For | Adds |
+|---|---|---|
+| `health-data` | Patlynk | Legal Officer: GDPR art. 9, HDS, French health data law, trial rules, medical device status, HIPAA readiness. Security Officer: patient data paths. Implementer: staging. All agents: no real patient data, no production. |
+| `finance-ledger` | Founder | Legal Officer: French accounting, VAT and e-invoicing, US filings. Security Officer: RLS, keys, ledger integrity. All agents: no cloud project access, no copied IBANs or tax IDs. |
+
+```sh
+node doc/solo-cto/profiles/apply.mjs --company "Patlynk" --profile health-data [--dry-run]
+```
+
+A fragment named after an agent goes before that officer's weekly audit, or at the end
+for any other agent. `all-agents.md` goes last on every agent. Re-run the script after
+changing the generic instructions; `import --collision replace` wipes a profile until
+you do. Each profile's officers read `docs/compliance-context.md` in the product
+repository every run, for the company's entities, processors and stated facts. Commit
+that file, and `docs/product-context.md`: agents work in worktrees, which don't contain
+untracked files.
+
+Profiles are working checklists, not legal advice. Have a lawyer or DPO confirm them.
+
 ### Directory isolation between companies
 
 Keep each company's repositories under one folder per company, all under a
@@ -123,7 +148,7 @@ company directory, for example `~/Workspaces/patlynk`. It then runs Claude
 Code's built-in macOS sandbox (Seatbelt, no Docker), plus matching
 permission rules.
 
-| | Read-only agents (Tech Lead, Product Lead, Planner) | Implementer |
+| | Read-only agents (all but the Implementer) | Implementer |
 |---|---|---|
 | Bash reads | Own company folder only; other companies are denied by the OS | Same |
 | Bash writes | None; the OS denies writes | Own workspace and the repo's `.git`; other companies are denied |
@@ -293,14 +318,31 @@ It:
   product;
 - writes an `implementation-report` document (changes, deviations, test
   results, diff stat);
-- sets the task to `in_review`.
+- asks the **Code Reviewer** for a review and waits (the task shows Blocked
+  for 5 to 15 minutes).
+
+The Code Reviewer reads the diff against the plan, read-only, and writes a
+`code-review` document with a verdict:
+
+- **Clear**, the expected verdict for most PRs: nothing needs your eyes beyond
+  CI. It means nothing worrying in the diff, not that the code was tested.
+- **Must read**: up to three spots, each with `file:line`, why and what to
+  check. Only for data-affecting changes, auth, permissions, secrets,
+  payments, production infrastructure, weakened safeguards, contract
+  changes, real uncertainty or a large plan deviation. The task gets the
+  **Must read** label, which shows on its board card.
+
+Clear bugs go to the Implementer instead. It fixes them once (no second
+review), adds an "Agent review" section to the PR description with the
+verdict and any Must-read spots, and sets the task to `in_review` (Waiting).
 
 If the plan must change, the Implementer writes a new plan revision. That
 invalidates the approval, so its next run is read-only until you approve
 again.
 
-**E. Review the work.** Review the PR, the report and the run logs. Mark the
-task `done` yourself; a finished run alone does not complete the task.
+**E. Review the work.** Without a Must read label, merge once CI is green.
+With one, read the listed spots first. Mark the task `done` yourself; a
+finished run alone does not complete the task.
 
 ## 6. What the gate enforces
 
@@ -343,6 +385,7 @@ Routines create discovery and audit tasks (Europe/Paris time):
 | Weekly legal audit | Mon 10:00 | Legal Officer | GDPR, cookies and consent, terms, privacy policy, legal notices, retention, processors |
 | Weekly security audit | Tue 10:00 | Security Officer | CVEs, secrets, authn/authz, input handling, headers, rate limits, PII in logs, IaC |
 | Weekly code health | Wed 08:00 | Tech Lead | Dead code, duplication, needless complexity, inefficiency |
+| Weekly guardrails audit | Thu 10:00 | Code Reviewer | Safeguards against agent mistakes: CI gates, tests on critical paths, lint and type rules, the repo's agent rules, informed by the week's code reviews |
 
 How they behave:
 
@@ -358,11 +401,14 @@ How they behave:
   Lead feasibility review for Product Lead suggestions, a Product Lead impact
   review for the others when they change user-facing behaviour. Then it parks
   the task **in Backlog, assigned to the Planner**. Nothing starts until you
-  drag it to Todo. Tasks you already assigned are left alone.
+  drag it to Todo. The discovery or audit task closes as soon as the reviews
+  are requested; nobody waits on them. Tasks you already assigned are left
+  alone.
 - Neither implements anything or assigns the Implementer.
 
 **Tags and swimlanes.** Agents tag tasks with the company labels Product,
-Tech, Security, Legal and Infra. Board cards show the tags; the board toolbar's
+Tech, Security, Legal and Infra; only the Code Reviewer sets Must read. Board
+cards show the tags; the board toolbar's
 rows button splits the board into one row of columns per tag.
 
 **Give the Product Lead context.** It works out the domain from the repo, then

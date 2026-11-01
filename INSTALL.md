@@ -227,12 +227,13 @@ pnpm paperclipai company import ./doc/solo-cto/company --target new --new-compan
 This creates:
 
 - the **Investigator**, **Tech Lead**, **Product Lead**, **Security Officer**, **Legal
-  Officer**, **Planner** and **Implementer** agents (`claude_local`, sandboxed, subscription
+  Officer**, **Code Reviewer**, **Planner** and **Implementer** agents (`claude_local`, sandboxed, subscription
   only; all but the Implementer read-only);
 - the **App** project;
 - the routines, in Europe/Paris time: **Daily technical discovery** (08:00), **Daily
   product discovery** (09:00), **Weekly legal audit** (Monday 10:00), **Weekly security
-  audit** (Tuesday 10:00) and **Weekly code health** (Wednesday 08:00).
+  audit** (Tuesday 10:00), **Weekly code health** (Wednesday 08:00) and **Weekly
+  guardrails audit** (Thursday 10:00).
 
 ### 7.2 Configure in the UI
 
@@ -246,8 +247,11 @@ This creates:
      Investigator, which challenges them and parks them for the Planner; dragging a card
      to Todo starts planning.
    - **Execution workspaces**: isolated, git worktree from `main` (the
-     package sets this). Without it every run shares the main checkout, and
-     the Implementer would work on top of your uncommitted changes. It only
+     package sets this). Prefer `origin/main` as the base: Paperclip fetches a
+     remote-tracking base before each new worktree, while a plain `main` is your
+     local branch, however far behind it is. Without isolation every run shares
+     the main checkout, and the Implementer would work on top of your uncommitted
+     changes. It only
      takes effect once **Instance settings → Experimental → Isolated
      workspaces** (`enableIsolatedWorkspaces`) is on, and it's off by default.
      Tasks created before you turn it on stay on the shared checkout, so
@@ -262,6 +266,16 @@ This creates:
      - **Untracked files:** a new worktree has none, such as `.env`. If the
        tests need one and CI builds it from `.env.example`, add the same step,
        e.g. `test -f .env || cp .env.example .env`.
+     - **Packages the sandbox can't install:** Claude Code's sandbox refuses to
+       create `.idea` folders, and some packages ship one, such as
+       `iconv-lite@0.6.3`. If `pnpm install` stops with `EPERM` on `.idea`, install
+       here instead. This step isn't sandboxed, so pass `--ignore-scripts
+       --ignore-pnpmfile`, and pass the store path explicitly, because this step
+       doesn't get the project env. `$PAPERCLIP_AGENT_NAME` limits it to the
+       Implementer.
+     - **Turbo repos:** Turbo's strict env mode drops `TMPDIR`, so tasks fall back
+       to a temp folder the sandbox denies and fail with `EPERM`. Add
+       `TURBO_ENV_MODE=loose` to the project env.
      - Chain the steps with `;`. Particups uses
        `test -f .env || cp .env.example .env; mise exec -- true`.
    - **Env**: add this company's secrets (see 7.3).
@@ -274,17 +288,27 @@ This creates:
    e.g. `[gh, aws, wrangler]`. It defaults to `[gh]`. The same editor holds
    `isolationRoot` and `allowedDomains`.
    - **Hide secret files** that sit inside the company folder, such as a repo
-     `.env`: add them to `claudeSandbox.extraDenyRead` on **all seven** agents,
+     `.env`: add them to `claudeSandbox.extraDenyRead` on **all eight** agents,
      e.g. `[~/Workspaces/particups/.env]`. Both Bash and Claude's Read/Grep/Glob
      tools are then denied. Worktrees don't contain the untracked `.env`, so
      give the Implementer what its tests need through the project env or the
      worktree setup above.
 5. **Labels** (any task → Labels → create): **Product** `#8250df`, **Tech** `#0969da`,
-   **Security** `#cf222e`, **Legal** `#bf8700`, **Infra** `#1a7f37`. Agents tag tasks with
-   these names; board cards show them, and the board toolbar's rows button splits the board
-   by tag.
-6. **Legal Officer → Instructions**: adjust its **Regimes** list for the company (for a
-   health product, add HDS and HIPAA).
+   **Security** `#cf222e`, **Legal** `#bf8700`, **Infra** `#1a7f37`, **Must read** `#bc4c00`.
+   Agents tag tasks with these names; board cards show them, and the board toolbar's rows
+   button splits the board by tag. Only the Code Reviewer sets **Must read**, on a pull
+   request you should read before merging.
+6. **Company profile** (regulated products): add the company's rules on top of the
+   generic instructions. `doc/solo-cto/profiles/` holds `health-data` (HDS, HIPAA) and
+   `finance-ledger` (accounting, tax):
+
+   ```sh
+   node doc/solo-cto/profiles/apply.mjs --company "Patlynk" --profile health-data
+   ```
+
+   Otherwise, adjust the **Regimes** list under **Legal Officer → Instructions** by hand.
+   Re-run `apply.mjs` after changing the generic instructions. An import with
+   `--collision replace` wipes a profile until you do.
 7. **Routines**: change the time or timezone of any routine, or pause it.
 8. **Product context**: copy `doc/solo-cto/product-context.template.md` to the
    product repo as `docs/product-context.md` and fill it in. The Product Lead
@@ -368,7 +392,23 @@ paths. Put the file in `.paperclip/`, not `.paperclip-tools/`, because the
 read-only agents can't read the tool home and their `git log` would fail.
 
 **Recommended:** protect `main` on GitHub, so an agent can push branches but
-never `main`.
+never `main`. On a private repository this needs a paid GitHub plan. Without it,
+the rule against pushing to `main` comes from the Implementer's instructions only.
+
+Give the token Contents and Pull requests read/write, and Actions, Commit statuses and
+Metadata **read-only**, so agents can read CI results and logs. Never give it Actions
+write or Workflows: Actions write can start any `workflow_dispatch`
+workflow, including a deploy, and Workflows lets a pushed workflow use your CI's secrets
+and cloud roles. Don't let a workflow that deploys or migrates run on
+`repository_dispatch` either: any token with Contents write can send that event, with
+whatever payload it likes. For the same reason, check workflows that run on `push` to
+`main` when `main` is unprotected: a token with Contents write can change the scripts
+they run.
+
+With this token `gh pr checks` fails on pull requests that have check runs
+(`Resource not accessible by personal access token`), so tell the Implementer to use
+`gh run list --branch <branch>` and `gh run view <id> --log-failed`. For those logs, add
+`results-receiver.actions.githubusercontent.com` to its `allowedDomains`.
 
 **Toolchains.** Agents get the Node, pnpm and Java versions the repo pins,
 through the mise shims: Paperclip removes its own `node_modules/.bin` and mise
@@ -386,13 +426,15 @@ env (absolute paths):
 
   ```sh
   G=~/Workspaces/<company>/.paperclip-tools/gradle
-  mkdir -p $G/init.d && cp doc/solo-cto/gradle/paperclip-sandbox-proxy.init.gradle $G/init.d/
+  mkdir -p $G/init.d && cp doc/solo-cto/gradle/paperclip-sandbox-*.init.gradle $G/init.d/
   printf 'org.gradle.daemon=false\nkotlin.compiler.execution.strategy=in-process\norg.gradle.vfs.watch=false\n' > $G/gradle.properties
   (cd <repo>/backend && GRADLE_USER_HOME=$G ./gradlew --version)   # caches the wrapper
   ```
 
-  The init script points Gradle at the proxy for each build without printing
-  anything. A long-lived daemon would outlive its sandbox session, hence
+  The proxy init script points Gradle at the proxy for each build without
+  printing anything. The MockK one loads Byte Buddy's agent when a test JVM
+  starts, because the sandbox denies the attach file MockK needs otherwise.
+  A long-lived daemon would outlive its sandbox session, hence
   `daemon=false`. The wrapper's own download redirects to GitHub release
   hosts, so the last line caches it from your terminal. Allow the repository
   hosts (`repo.maven.apache.org`, `repo1.maven.org`, `plugins.gradle.org`,
