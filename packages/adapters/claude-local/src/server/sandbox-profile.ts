@@ -67,7 +67,11 @@ export class ClaudeSandboxProfileError extends Error {
 }
 
 /** Personal secrets no agent may read (`.pgpass` is a file, denied by exact path). */
-const SECRET_DIRS = [".ssh", ".aws", ".gnupg", ".paperclip", ".pgpass"];
+// Library/Keychains: without it, `security find-generic-password -w` returns
+// any item that trusts the `security` tool, which every item it created does
+// (probed on Claude Code 2.1.316). Agents' git and gh credentials come from
+// Paperclip, never the Keychain.
+const SECRET_DIRS = [".ssh", ".aws", ".gnupg", ".paperclip", ".pgpass", "Library/Keychains"];
 /** Only read-only agents lose GitHub CLI credentials; the implementer opens PRs. */
 const READ_ONLY_SECRET_DIRS = [".config/gh"];
 

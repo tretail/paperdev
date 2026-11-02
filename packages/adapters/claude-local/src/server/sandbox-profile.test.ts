@@ -87,6 +87,7 @@ describe("resolveClaudeSandboxProfile", () => {
       `Read(/${path.join(home, ".pgpass")})`,
     ]));
     expect(sandboxSettings.filesystem.denyRead).toContain(path.join(home, ".pgpass"));
+    expect(sandboxSettings.filesystem.denyRead).toContain(path.join(home, "Library/Keychains"));
     // Paths Claude needs (prompt bundle, skills) are carved out, not denied.
     expect(profile.disallowedTools.some((rule) => rule.includes(bundle))).toBe(false);
     expect(profile.disallowedTools).not.toContain(`Read(/${path.join(ws, "paperclip")}/**)`);

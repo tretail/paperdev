@@ -154,7 +154,7 @@ permission rules.
 | Bash writes | None; the OS denies writes | Own workspace and the repo's `.git`; other companies are denied |
 | Claude Read/Grep/Glob | Own company folder plus Paperclip's prompt bundle and skills | Everything except other companies and secrets |
 | Claude Edit/Write | Not loaded | Denied for other companies and secrets |
-| Secrets | `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.paperclip`, `~/.pgpass`, `~/.config/gh` unreadable | Same, except `~/.config/gh`, which it needs to open PRs |
+| Secrets | `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.paperclip`, `~/.pgpass`, `~/Library/Keychains`, `~/.config/gh` unreadable | Same, except `~/.config/gh`, which it needs to open PRs |
 | Network | Localhost only (the Paperclip API) | Localhost plus `allowedDomains` (GitHub, npm registry by default) |
 | Environment | The server's `DATABASE_URL`, its `pnpm dev` variables and its mise shell state are never passed on; tools resolve to each repo's pins through the mise shims | Same |
 
@@ -165,6 +165,12 @@ INSTALL.md §4): with Postgres.app's default `trust` rules, an agent can log in
 as a superuser and run commands outside the sandbox. For the same reason,
 Paperclip must not run on its embedded Postgres (`127.0.0.1:54329`, fixed
 password `paperclip`): set `DATABASE_URL` in the instance env.
+
+**The Keychain is denied too**, so deploy secrets kept there (as with
+`security find-generic-password` in a repo's `.mise.local.toml`) stay out of
+agents' reach, even though agent worktrees inside the repo inherit that file.
+mise then gives them empty values, so a repo must not need a Keychain item for
+agent work.
 
 A new company folder is picked up automatically on the next run. Use
 `extraDenyRead` to hide more paths.
