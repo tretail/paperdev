@@ -4,7 +4,7 @@
 #   postgres-server.sh --name particups --version 17 --port 5433 --role particups \
 #     --password particups [--restore <file from pg_dump -Fc>]
 #   postgres-server.sh --name tablebear --version 18 --port 5434 --role app --password app \
-#     --role-attrs "CREATEDB BYPASSRLS" --init-sql tools/db/native-roles.sql
+#     --role-attrs "CREATEDB BYPASSRLS" --init-sql tools/db/native-roles.sql --max-connections 400
 #
 # Loopback only, and a password on every connection. With Postgres.app's default trust rules,
 # any local process could log in as a superuser and run commands as you (COPY ... PROGRAM),
@@ -15,7 +15,8 @@
 # --role-attrs adds attributes to the app role; only CREATEDB, BYPASSRLS and CREATEROLE are
 # accepted, never SUPERUSER. --init-sql runs a file as the superuser once, after the role exists:
 # for what the app role can't do itself, such as creating the roles its migrations expect. Read
-# the file first: it runs with full rights.
+# the file first: it runs with full rights. --max-connections raises Postgres's default of 100,
+# for test suites that open many pools; every worktree's tests share the server.
 #
 # It uses Postgres.app's binaries, but Postgres.app's window doesn't list the server.
 # To remove it: launchctl bootout gui/$(id -u)/dev.paperclip.postgres.<name>, delete the plist
@@ -24,7 +25,7 @@ set -eu
 # Byte-wise character ranges: in en_US.UTF-8, [A-Z] in a pattern also matches lowercase letters.
 export LC_ALL=C
 
-name="" version="" port="" role="" password="" restore="" role_attrs="CREATEDB" init_sql=""
+name="" version="" port="" role="" password="" restore="" role_attrs="CREATEDB" init_sql="" max_connections=100
 while [ $# -gt 0 ]; do
   case "$1" in
     --name) name=$2 ;;
@@ -35,6 +36,7 @@ while [ $# -gt 0 ]; do
     --restore) restore=$2 ;;
     --role-attrs) role_attrs=$2 ;;
     --init-sql) init_sql=$2 ;;
+    --max-connections) max_connections=$2 ;;
     *) sed -n '2,8p' "$0" >&2; exit 2 ;;
   esac
   shift 2
@@ -42,7 +44,7 @@ done
 [ -n "$name" ] && [ -n "$version" ] && [ -n "$port" ] && [ -n "$role" ] && [ -n "$password" ] || { sed -n '2,8p' "$0" >&2; exit 2; }
 case "$name$role" in *[!a-z0-9_]*) echo "name and role: lowercase letters, digits and _ only" >&2; exit 2 ;; esac
 case "$password" in *[!A-Za-z0-9_-]*) echo "password: letters, digits, _ and - only" >&2; exit 2 ;; esac
-case "$port$version" in *[!0-9]*) echo "port and version: digits only" >&2; exit 2 ;; esac
+case "$port$version$max_connections" in *[!0-9]*) echo "port, version and max-connections: digits only" >&2; exit 2 ;; esac
 
 bin=/Applications/Postgres.app/Contents/Versions/$version/bin
 data="$HOME/Library/Application Support/Postgres/$name-$version"
@@ -83,6 +85,7 @@ cat >>"$data/postgresql.conf" <<EOF
 # $name local development: loopback only (see paperdev doc/solo-cto/local-dev).
 listen_addresses = '127.0.0.1'
 port = $port
+max_connections = $max_connections
 EOF
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
