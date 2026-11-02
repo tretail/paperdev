@@ -259,10 +259,19 @@ This creates:
    - **Worktree setup**: set the project's
      `workspaceStrategy.provisionCommand`. It runs outside the sandbox in
      each worktree when it is created or reused.
-     - **mise repos:** add `mise exec -- true`. A worktree of a trusted repo
-       inherits mise trust, but mise records it under `~/.local/state/mise`
-       on first use, which the sandbox denies. Until then every `mise exec`
-       in the run fails, including git hooks that use it.
+     - **mise repos:** add
+       `wt=$PWD; [ ! -f .mise.toml ] || [ -L .mise.toml ] || (cd / && mise trust --quiet "$wt/.mise.toml")`.
+       A worktree of a trusted repo inherits mise trust, but mise records it
+       under `~/.local/state/mise` on first use, which the sandbox denies.
+       Until then every `mise exec` in the run fails, including git hooks that
+       use it. Shims still work. `mise trust` writes that record without
+       loading the file. Don't use `mise exec -- true` here: it loads the
+       worktree's config outside the sandbox, and an agent can add
+       `[env] _.source = "./x.sh"` to it (probed: `mise exec` runs it, even
+       in a folder never trusted, since mise trusts the config of any command
+       that runs project code; `mise trust` doesn't). The cost is that a version the config newly
+       pins isn't installed for you: after merging a bump, run `mise install`
+       in the main checkout.
      - **Untracked files:** a new worktree has none, such as `.env`. If the
        tests need one and CI builds it from `.env.example`, add the same step,
        e.g. `test -f .env || cp .env.example .env`.
@@ -276,8 +285,9 @@ This creates:
      - **Turbo repos:** Turbo's strict env mode drops `TMPDIR`, so tasks fall back
        to a temp folder the sandbox denies and fail with `EPERM`. Add
        `TURBO_ENV_MODE=loose` to the project env.
-     - Chain the steps with `;`. Particups uses
-       `test -f .env || cp .env.example .env; mise exec -- true`.
+     - Chain the steps with `;`. Particups uses its database step
+       (`paperclip-worktree-db provision …`, see `doc/solo-cto/local-dev/`)
+       followed by the mise step above.
    - **Env**: add this company's secrets (see 7.3).
 2. **Company Settings → interaction governance**: set confirmations to
    **Human only**.
@@ -459,6 +469,40 @@ env (absolute paths):
   "Could not self-attach to current VM". Load Mockito as a `-javaagent` in
   the repo's test config instead, which Mockito recommends on JDK 21+.
 
+### 7.4 Local services, previews and Tailscale (optional)
+
+`doc/solo-cto/local-dev/` replaces each app's Docker services with native ones
+and lets you open a worktree's running app from another device. Each script
+explains itself in its header. Install the scripts into `~/.local/bin` as
+`paperclip-<name>` (the gate keeps its `.cjs` extension), never inside a
+repository: Paperclip runs them outside the agents' sandbox.
+
+- **Services:** `postgres-server.sh` and `mailpit-server.sh` start one
+  Postgres.app server and one Mailpit per app under launchd, on loopback, with
+  a password on every Postgres connection and an app role that isn't a
+  superuser.
+- **A database per worktree:** `worktree-db.sh` in the project's
+  `provisionCommand` and `teardownCommand` clones a seeded template and writes
+  the worktree's `.env`.
+- **Previews:** a project workspace's runtime service with `port: auto` runs
+  `preview-sandbox.sh <dev command>`, which puts the dev server in a macOS
+  sandbox like the agents': its own company folder only, no secrets, writes
+  only in the worktree, no internet. An app that needs more than one process
+  gets its own wrapper, such as `tablebear-preview.sh` (Spring backend and Vite
+  app, with the app starting once the backend answers).
+- **Tailscale:** `preview-sandbox.sh --tailnet` publishes the preview as
+  `https://<Mac>.<tailnet>.ts.net:$PORT` with a foreground `tailscale serve`
+  in front of `tailnet-gate.cjs`. The gate lets only the Mac owner's own
+  Tailscale login through, whatever the tailnet's access rules allow, and both
+  stop with the preview. `--tailnet-port N` publishes another port the browser
+  needs, such as a backend or the Mailpit UI. Set the service's
+  `expose.urlTemplate` to `https://<Mac>.<tailnet>.ts.net:{{port}}`. Paperclip
+  itself: keep it on loopback in `authenticated` + `private` mode, add the
+  hostname to `PAPERCLIP_ALLOWED_HOSTNAMES` (instance `.env`), set
+  `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` once you've claimed the board, restart
+  it, then run `tailscale serve --bg --https=443 http://127.0.0.1:3100`.
+  Never use Funnel.
+
 ## 8. How the workflow works
 
 1. **Create a task** in the company's App project.
@@ -519,7 +563,7 @@ command):
 | An agent reports Paperclip's own Node/pnpm versions instead of the repo's | Restart `pnpm dev` on a build with the launcher-`PATH` fix, and `mise trust` the repo. `command -v node` in a run should point to `mise/shims`. |
 | Gradle: `UnknownHostException` or "Plugin … was not found" | The proxy init script or the cached wrapper is missing from `GRADLE_USER_HOME` (7.3, Toolchains). Otherwise check `allowedDomains`. |
 | Kotlin: `FileSystemException: /var/folders/…/kotlin-compiler-….alive: Operation not permitted` | The Paperclip build predates the JVM temp-dir profile (7.3, Toolchains). Update and restart `pnpm dev`. |
-| `git commit` fails in a hook: mise "failed to ln -sf … trusted-configs … Operation not permitted" | Add `mise exec -- true` to the project's `provisionCommand` (section 7.2, Worktree setup). An existing worktree keeps its own copy of the command, so set it on that execution workspace too, or start a new task. |
+| `git commit` fails in a hook: mise "failed to ln -sf … trusted-configs … Operation not permitted" | Add the `mise trust` step to the project's `provisionCommand` (section 7.2, Worktree setup). An existing worktree keeps its own copy of the command, so set it on that execution workspace too, or start a new task. |
 | A JVM test task hangs with no output (on macOS, a native stack in `LWCToolkit.initAppkit`) | The Paperclip build predates `-Djava.awt.headless=true` in the JVM profile (7.3, Toolchains). Update and restart `pnpm dev`. |
 | Mockito: "Could not self-attach to current VM using external process" | The sandbox blocks JVM agent attach. Load Mockito as a `-javaagent` in the repo's test config (7.3, Toolchains). |
 | A run that used the subscription shows "Connect your Claude account" | The Paperclip build predates the login-detector fix (`claude_auth_required` on a successful run). Update, restart `pnpm dev`, and dismiss the card. |

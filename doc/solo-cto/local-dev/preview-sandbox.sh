@@ -5,6 +5,7 @@
 #
 #   preview-sandbox.sh --ports 5433,1125,8125 pnpm dev     (a service command, in the worktree)
 #   preview-sandbox.sh --local-network --write <company>/.paperclip-tools/gradle <command>
+#   preview-sandbox.sh --tailnet --tailnet-port 8125 --ports 5433,1125,8125 pnpm dev
 #
 # The current directory is a worktree inside ~/Workspaces/<company>/, or the company's main
 # checkout (which then can write the whole company folder). The command:
@@ -21,24 +22,38 @@
 # an agent's own sandbox allows (allowLocalBinding, and its tests reach Postgres on loopback), so
 # the preview gains nothing its agents don't have. It still reaches no internet and no Unix socket.
 #
-# Keep this file outside the repositories, where agents can't edit it.
-# Tailscale, later: run `tailscale serve` for $PORT here, before the sandbox starts.
+# --tailnet publishes $PORT on the tailnet as https://<this Mac's tailnet name>:$PORT, and each
+# --tailnet-port N publishes port N the same way (a backend the app calls from the browser, the
+# Mailpit UI). Outside the sandbox and before it starts, each gets `tailscale serve` in front of a
+# tailnet-gate.cjs that lets only the Mac owner's own Tailscale login through, whatever the
+# tailnet's access rules allow. They run in this script's process group, so they end with the
+# preview: Paperclip stops a service by signalling the whole group, and tailscale drops a route
+# when its foreground `serve` ends, even on SIGKILL (probed). The command then gets
+# PREVIEW_TAILNET_HOST, and Vite's extra allowed host. Tailscale not running: the preview starts
+# on loopback only, with a warning.
+#
+# Keep this file outside the repositories, where agents can't edit it. Its helpers sit next to
+# it: tailnet-gate.cjs, installed as paperclip-tailnet-gate.cjs.
 set -eu
 
-usage() { sed -n '2,7p' "$0" >&2; exit 2; }
-ports="" local_network="" writes=""
+usage() { sed -n '2,8p' "$0" >&2; exit 2; }
+ports="" local_network="" writes="" tailnet_ports=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --ports) [ $# -ge 2 ] || usage; ports=$2; shift 2 ;;
     --write) [ $# -ge 2 ] || usage; writes="$writes
 $2"; shift 2 ;;
     --local-network) local_network=1; shift ;;
+    --tailnet) [ -n "${PORT:-}" ] || { echo "preview-sandbox: --tailnet needs PORT" >&2; exit 2; }
+      tailnet_ports="$tailnet_ports,$PORT"; shift ;;
+    --tailnet-port) [ $# -ge 2 ] || usage; tailnet_ports="$tailnet_ports,$2"; shift 2 ;;
     --) shift; break ;;
     *) break ;;
   esac
 done
 [ $# -ge 1 ] || usage
-case "$ports,${PORT:-}" in *[!0-9,]*) echo "preview-sandbox: ports and PORT: digits and commas only" >&2; exit 2 ;; esac
+case "$ports,${PORT:-}$tailnet_ports" in *[!0-9,]*) echo "preview-sandbox: ports and PORT: digits and commas only" >&2; exit 2 ;; esac
+here=$(cd "$(dirname "$0")" && pwd -P)
 
 root=$(cd "$HOME/Workspaces" && pwd -P)
 cwd=$(pwd -P)
@@ -124,4 +139,59 @@ EOF
 }
 profile=$(write_profile)
 
-exec /usr/bin/sandbox-exec -p "$profile" "$@"
+# The Mac's tailnet name and its owner's login, from a running Tailscale.
+tailnet_identity() {
+  tailscale status --json 2>/dev/null | /usr/bin/python3 -I -c '
+import json, re, sys
+d = json.load(sys.stdin)
+me = d.get("Self") or {}
+host = (me.get("DNSName") or "").rstrip(".").lower()
+login = ((d.get("User") or {}).get(str(me.get("UserID")), {}).get("LoginName") or "").lower()
+ok = d.get("BackendState") == "Running" and re.fullmatch(r"[a-z0-9.-]+", host) and re.fullmatch(r"[^\s]+@[^\s]+", login)
+print(host, login) if ok else sys.exit(1)'
+}
+
+free_port() {
+  /usr/bin/python3 -I -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'
+}
+
+helpers=""
+if [ -n "$tailnet_ports" ]; then
+  gate=$here/paperclip-tailnet-gate.cjs
+  [ -f "$gate" ] || gate=$here/tailnet-gate.cjs
+  # Node as pinned by the company's main checkout (yours, on main), else an installed Node 24:
+  # never resolved in the worktree, whose mise config is the agents'.
+  node_dir=$(cd "$company" && mise where node 2>/dev/null) ||
+    node_dir=$(cd "$HOME" && mise where node@24 2>/dev/null) || node_dir=""
+  node_bin=$node_dir/bin/node
+  if [ ! -f "$gate" ] || [ -z "$node_dir" ] || [ ! -x "$node_bin" ]; then
+    echo "preview-sandbox: no tailnet-gate.cjs next to $0, or no Node: loopback only" >&2
+  elif ! identity=$(tailnet_identity); then
+    echo "preview-sandbox: Tailscale isn't running: loopback only" >&2
+  else
+    tailnet_host=${identity% *} tailnet_login=${identity#* }
+    for port in $(printf '%s' "$tailnet_ports" | tr ',' ' '); do
+      gate_port=$(free_port)
+      "$node_bin" "$gate" "$gate_port" "$port" "$tailnet_login" &
+      helpers="$helpers $!"
+      tailscale serve --https="$port" "http://127.0.0.1:$gate_port" </dev/null &
+      helpers="$helpers $!"
+      echo "preview-sandbox: https://$tailnet_host:$port on the tailnet, for $tailnet_login only" >&2
+    done
+    export PREVIEW_TAILNET_HOST="$tailnet_host"
+    export __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS="${__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS:+$__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS,}$tailnet_host"
+  fi
+fi
+
+[ -n "$helpers" ] || exec /usr/bin/sandbox-exec -p "$profile" "$@"
+
+# With tailnet helpers, this shell stays to stop them when the preview ends (or is stopped
+# without its process group).
+child=""
+trap 'kill $child $helpers 2>/dev/null || true' EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+trap 'exit 129' HUP
+/usr/bin/sandbox-exec -p "$profile" "$@" &
+child=$!
+wait "$child"
