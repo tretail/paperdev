@@ -3,6 +3,8 @@
 #
 #   postgres-server.sh --name particups --version 17 --port 5433 --role particups \
 #     --password particups [--restore <file from pg_dump -Fc>]
+#   postgres-server.sh --name tablebear --version 18 --port 5434 --role app --password app \
+#     --role-attrs "CREATEDB BYPASSRLS" --init-sql tools/db/native-roles.sql
 #
 # Loopback only, and a password on every connection. With Postgres.app's default trust rules,
 # any local process could log in as a superuser and run commands as you (COPY ... PROGRAM),
@@ -10,12 +12,19 @@
 # ~/.pgpass, which agents can't read. The app role gets CREATEDB but isn't a superuser; it
 # owns <name> and <name>_test, and worktree-db.sh clones databases with it.
 #
+# --role-attrs adds attributes to the app role; only CREATEDB, BYPASSRLS and CREATEROLE are
+# accepted, never SUPERUSER. --init-sql runs a file as the superuser once, after the role exists:
+# for what the app role can't do itself, such as creating the roles its migrations expect. Read
+# the file first: it runs with full rights.
+#
 # It uses Postgres.app's binaries, but Postgres.app's window doesn't list the server.
 # To remove it: launchctl bootout gui/$(id -u)/dev.paperclip.postgres.<name>, delete the plist
 # in ~/Library/LaunchAgents, the data folder it prints, and its two lines in ~/.pgpass.
 set -eu
+# Byte-wise character ranges: in en_US.UTF-8, [A-Z] in a pattern also matches lowercase letters.
+export LC_ALL=C
 
-name="" version="" port="" role="" password="" restore=""
+name="" version="" port="" role="" password="" restore="" role_attrs="CREATEDB" init_sql=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --name) name=$2 ;;
@@ -24,11 +33,13 @@ while [ $# -gt 0 ]; do
     --role) role=$2 ;;
     --password) password=$2 ;;
     --restore) restore=$2 ;;
-    *) sed -n '2,6p' "$0" >&2; exit 2 ;;
+    --role-attrs) role_attrs=$2 ;;
+    --init-sql) init_sql=$2 ;;
+    *) sed -n '2,8p' "$0" >&2; exit 2 ;;
   esac
   shift 2
 done
-[ -n "$name" ] && [ -n "$version" ] && [ -n "$port" ] && [ -n "$role" ] && [ -n "$password" ] || { sed -n '2,6p' "$0" >&2; exit 2; }
+[ -n "$name" ] && [ -n "$version" ] && [ -n "$port" ] && [ -n "$role" ] && [ -n "$password" ] || { sed -n '2,8p' "$0" >&2; exit 2; }
 case "$name$role" in *[!a-z0-9_]*) echo "name and role: lowercase letters, digits and _ only" >&2; exit 2 ;; esac
 case "$password" in *[!A-Za-z0-9_-]*) echo "password: letters, digits, _ and - only" >&2; exit 2 ;; esac
 case "$port$version" in *[!0-9]*) echo "port and version: digits only" >&2; exit 2 ;; esac
@@ -48,6 +59,13 @@ if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
   exit 1
 fi
 [ -z "$restore" ] || [ -f "$restore" ] || { echo "$restore not found" >&2; exit 1; }
+[ -z "$init_sql" ] || [ -f "$init_sql" ] || { echo "$init_sql not found" >&2; exit 1; }
+for attr in $role_attrs; do
+  case "$attr" in
+    CREATEDB | BYPASSRLS | CREATEROLE) ;;
+    *) echo "--role-attrs: only CREATEDB, BYPASSRLS and CREATEROLE, not $attr" >&2; exit 2 ;;
+  esac
+done
 
 umask 077
 superuser_password=$(openssl rand -hex 24)
@@ -98,9 +116,14 @@ until "$bin/pg_isready" -q -h 127.0.0.1 -p "$port"; do
 done
 
 "$bin/psql" -h 127.0.0.1 -p "$port" -U postgres -d postgres -w -XAtq -v ON_ERROR_STOP=1 \
-  -c "CREATE ROLE $role LOGIN PASSWORD '$password' CREATEDB" \
+  -c "CREATE ROLE $role LOGIN PASSWORD '$password' $role_attrs" \
   -c "CREATE DATABASE $name OWNER $role" \
   -c "CREATE DATABASE ${name}_test OWNER $role"
+
+if [ -n "$init_sql" ]; then
+  "$bin/psql" -h 127.0.0.1 -p "$port" -U postgres -d postgres -w -Xq -v ON_ERROR_STOP=1 -f "$init_sql"
+  echo "ran $init_sql as the superuser"
+fi
 
 if [ -n "$restore" ]; then
   PGPASSWORD=$password "$bin/pg_restore" -h 127.0.0.1 -p "$port" -U "$role" -d "$name" \
@@ -109,4 +132,4 @@ if [ -n "$restore" ]; then
 fi
 
 echo "Postgres $version for $name: 127.0.0.1:$port, data in $data, log in $log"
-echo "databases $name and ${name}_test, owned by $role (CREATEDB, not a superuser)"
+echo "databases $name and ${name}_test, owned by $role ($role_attrs, not a superuser)"
