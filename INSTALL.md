@@ -489,7 +489,10 @@ repository: Paperclip runs them outside the agents' sandbox.
   sandbox like the agents': its own company folder only, no secrets, writes
   only in the worktree, no internet. An app that needs more than one process
   gets its own wrapper, such as `tablebear-preview.sh` (Spring backend and Vite
-  app, with the app starting once the backend answers).
+  app, with the app starting once the backend answers). A wrapper must not
+  `exec` into another program. When Paperclip restarts, it adopts a running
+  preview only if the process it started still shows the service's command.
+  Otherwise it starts a second copy and leaves the first one running.
 - **Tailscale:** `preview-sandbox.sh --tailnet` publishes the preview as
   `https://<Mac>.<tailnet>.ts.net:$PORT` with a foreground `tailscale serve`
   in front of `tailnet-gate.cjs`. The gate lets only the Mac owner's own

@@ -54,8 +54,11 @@ export JAVA_TOOL_OPTIONS="-Djava.net.preferIPv4Stack=true -Xmx1536m"
 export TURBO_DAEMON=false TURBO_TELEMETRY_DISABLED=1 TURBO_NO_UPDATE_NOTIFIER=1
 
 echo "tablebear-preview: app on port $PORT, backend on port $backend_port"
+# Not exec: this process must keep its own command line. After a restart, Paperclip adopts a
+# surviving preview only if the process it started still shows the service's command
+# (paperclip-preview-tablebear); otherwise it starts a second copy and leaves this one running.
 # shellcheck disable=SC2016 # the inner script expands its variables itself, inside the sandbox
-exec "$sandbox" --local-network --write "$gradle_home" \
+"$sandbox" --local-network --write "$gradle_home" \
   --tailnet --tailnet-port "$backend_port" --tailnet-port "$mailpit_ui_port" /bin/sh -c '
   set -eu
   api=http://127.0.0.1:$BACKEND_PORT
@@ -82,4 +85,4 @@ exec "$sandbox" --local-network --write "$gradle_home" \
   # Loose env mode: turbo would otherwise drop Vite'"'"'s extra allowed host, which isn'"'"'t VITE_*.
   VITE_API_URL=$api VITE_AUTH_MODE=stub \
     pnpm exec turbo run dev --env-mode=loose --filter=@repo/app -- --port "$PORT" --strictPort --host 127.0.0.1
-'
+' || exit $?

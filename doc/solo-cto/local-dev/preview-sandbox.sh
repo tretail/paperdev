@@ -183,10 +183,10 @@ if [ -n "$tailnet_ports" ]; then
   fi
 fi
 
-[ -n "$helpers" ] || exec /usr/bin/sandbox-exec -p "$profile" "$@"
-
-# With tailnet helpers, this shell stays to stop them when the preview ends (or is stopped
-# without its process group).
+# This shell stays, never exec: it stops the tailnet helpers when the preview ends (or is stopped
+# without its process group), and it keeps the command line Paperclip started. After a restart,
+# Paperclip adopts a surviving preview only if that process still shows the service's command;
+# otherwise it starts a second copy and leaves this one running.
 child=""
 trap 'kill $child $helpers 2>/dev/null || true' EXIT
 trap 'exit 143' TERM
