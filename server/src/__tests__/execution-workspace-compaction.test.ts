@@ -422,6 +422,16 @@ describeEmbeddedPostgres("terminal workspace compaction", () => {
 
   it("leaves files alone while a runtime service runs from the worktree", async () => {
     const seeded = await seedWorkspace();
+    // A finished task's own services stop with it; an open task reusing the worktree keeps them.
+    await db.insert(issues).values({
+      companyId: seeded.companyId,
+      projectId: seeded.projectId,
+      identifier: `${seeded.issuePrefix}-2`,
+      title: "Open task reusing the worktree",
+      status: "in_review",
+      priority: "medium",
+      executionWorkspaceId: seeded.executionWorkspaceId,
+    });
     await db.insert(workspaceRuntimeServices).values({
       id: randomUUID(),
       companyId: seeded.companyId,

@@ -3,14 +3,18 @@
 import { createRoot, type Root } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { Issue, IssuePullRequestSummary, IssueStatus } from "@paperclipai/shared";
+import type { Issue, IssuePullRequestSummary, IssueRuntimeServiceSummary, IssueStatus } from "@paperclipai/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getKanbanColumnTone, groupKanbanLanes, KanbanBoard, KANBAN_UNTAGGED_LANE, resolveKanbanTargetStatus } from "./KanbanBoard";
 
 const pullRequestsMock = vi.hoisted(() => ({ summaries: [] as IssuePullRequestSummary[] }));
+const runtimeServicesMock = vi.hoisted(() => ({ summaries: [] as IssueRuntimeServiceSummary[] }));
 
 vi.mock("../api/issues", () => ({
-  issuesApi: { pullRequests: vi.fn(async () => pullRequestsMock.summaries) },
+  issuesApi: {
+    pullRequests: vi.fn(async () => pullRequestsMock.summaries),
+    runtimeServices: vi.fn(async () => runtimeServicesMock.summaries),
+  },
 }));
 
 vi.mock("@/lib/router", () => ({
@@ -119,6 +123,7 @@ describe("KanbanBoard", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     pullRequestsMock.summaries = [];
+    runtimeServicesMock.summaries = [];
   });
 
   afterEach(() => {
@@ -271,6 +276,47 @@ describe("KanbanBoard", () => {
     expect(link.parentElement?.closest("a")).toBeNull();
     // Only the card with a pull request gets a button.
     expect(container.querySelectorAll('a[href^="https://github.com"]')).toHaveLength(1);
+  });
+
+  it("links a card to its running preview in a new tab, beside its pull request", async () => {
+    pullRequestsMock.summaries = [{
+      issueId: "issue-in_review-1",
+      url: "https://github.com/acme/app/pull/7",
+      number: 7,
+      state: "open",
+    }];
+    runtimeServicesMock.summaries = [{
+      issueId: "issue-in_review-1",
+      serviceName: "Preview",
+      url: "https://mini.example.ts.net:5173",
+    }];
+    const { container } = renderBoard({ issues: createIssues(2, "in_review") });
+    await vi.waitFor(() => expect(container.querySelector('a[href^="https://mini.example.ts.net"]')).not.toBeNull());
+    await vi.waitFor(() => expect(container.querySelector('a[href^="https://github.com"]')).not.toBeNull());
+
+    const link = container.querySelector<HTMLAnchorElement>('a[href^="https://mini.example.ts.net"]')!;
+    expect(link.getAttribute("href")).toBe("https://mini.example.ts.net:5173");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(link.getAttribute("aria-label")).toBe("Open Preview in a new tab");
+    expect(link.parentElement?.closest("a")).toBeNull();
+    // Both buttons share one group, preview first.
+    const group = link.parentElement!;
+    expect([...group.querySelectorAll("a")].map((anchor) => anchor.getAttribute("href")))
+      .toEqual(["https://mini.example.ts.net:5173", "https://github.com/acme/app/pull/7"]);
+
+    // Pressing the button neither starts a drag nor opens the task.
+    const reachedCard = vi.fn();
+    document.body.addEventListener("pointerdown", reachedCard);
+    document.body.addEventListener("click", reachedCard);
+    link.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    document.body.removeEventListener("pointerdown", reachedCard);
+    document.body.removeEventListener("click", reachedCard);
+    expect(reachedCard).not.toHaveBeenCalled();
+
+    // Only the card with a running preview gets one.
+    expect(container.querySelectorAll('a[href^="https://mini.example.ts.net"]')).toHaveLength(1);
   });
 
   describe("tag swimlanes", () => {

@@ -25,10 +25,10 @@ import { PullRequestStateIcon } from "./PullRequestStateIcon";
 import { IssueLabelChip, IssueLabelChips } from "./IssueLabelChip";
 import { SHOW_TASK_PRIORITY_UI } from "../lib/ui-flags";
 import { Identity } from "./Identity";
-import type { Issue, IssueLabel, IssuePullRequestSummary, IssueStatus } from "@paperclipai/shared";
+import type { Issue, IssueLabel, IssuePullRequestSummary, IssueRuntimeServiceSummary, IssueStatus } from "@paperclipai/shared";
 import { issuesApi } from "../api/issues";
 import { queryKeys } from "../lib/queryKeys";
-import { AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, MonitorPlay } from "lucide-react";
 import { isSuccessfulRunHandoffRequired } from "../lib/successful-run-handoff";
 import { collectSubtreeLiveCounts } from "../lib/liveIssueIds";
 import { cn } from "../lib/utils";
@@ -223,6 +223,7 @@ function KanbanColumn({
   liveIssueIds,
   subtreeLiveCounts,
   pullRequests,
+  runtimeServices,
   compactCards = false,
   collapsed = false,
   visibleCount,
@@ -237,6 +238,7 @@ function KanbanColumn({
   liveIssueIds?: Set<string>;
   subtreeLiveCounts?: ReadonlyMap<string, number>;
   pullRequests?: ReadonlyMap<string, IssuePullRequestSummary>;
+  runtimeServices?: ReadonlyMap<string, IssueRuntimeServiceSummary>;
   compactCards?: boolean;
   collapsed?: boolean;
   visibleCount: number;
@@ -304,6 +306,7 @@ function KanbanColumn({
               isLive={liveIssueIds?.has(issue.id)}
               subtreeLiveCount={subtreeLiveCounts?.get(issue.id) ?? 0}
               pullRequest={pullRequests?.get(issue.id)}
+              runtimeService={runtimeServices?.get(issue.id)}
               compact={compactCards}
               className={tone.card}
             />
@@ -328,10 +331,16 @@ function KanbanColumn({
   );
 }
 
-/* ── Pull request button ── */
+/* ── Card link buttons ── */
+
+const CARD_LINK_BUTTON_CLASS =
+  "inline-flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-xs text-muted-foreground no-underline transition-colors hover:border-foreground/30 hover:text-foreground";
+
+// The card is draggable and opens the task; pressing one of its link buttons does neither.
+const stopCardInteraction = (event: { stopPropagation: () => void }) => event.stopPropagation();
 
 /** Opens the task's pull request on GitHub, showing GitHub's icon for its state and its number. */
-function PullRequestCardLink({ pullRequest, compact }: { pullRequest: IssuePullRequestSummary; compact: boolean }) {
+function PullRequestCardLink({ pullRequest }: { pullRequest: IssuePullRequestSummary }) {
   const state = pullRequest.state === "unknown" ? "state unknown" : pullRequest.state;
   const label = `Open pull request${pullRequest.number ? ` #${pullRequest.number}` : ""} (${state}) on GitHub`;
   return (
@@ -341,16 +350,31 @@ function PullRequestCardLink({ pullRequest, compact }: { pullRequest: IssuePullR
       rel="noopener noreferrer"
       title={label}
       aria-label={label}
-      // The card is draggable and opens the task; pressing this button does neither.
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={(event) => event.stopPropagation()}
-      className={cn(
-        "absolute inline-flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-muted-foreground no-underline transition-colors hover:border-foreground/30 hover:text-foreground",
-        compact ? "bottom-2 right-2" : "bottom-2.5 right-2.5",
-      )}
+      onPointerDown={stopCardInteraction}
+      onClick={stopCardInteraction}
+      className={cn(CARD_LINK_BUTTON_CLASS, "font-mono")}
     >
       <PullRequestStateIcon state={pullRequest.state} />
       {pullRequest.number ? `#${pullRequest.number}` : null}
+    </a>
+  );
+}
+
+/** Opens the task's running preview (or other service with a URL) in a new tab. */
+function RuntimeServiceCardLink({ service }: { service: IssueRuntimeServiceSummary }) {
+  const label = `Open ${service.serviceName} in a new tab`;
+  return (
+    <a
+      href={service.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={label}
+      aria-label={label}
+      onPointerDown={stopCardInteraction}
+      onClick={stopCardInteraction}
+      className={CARD_LINK_BUTTON_CLASS}
+    >
+      <MonitorPlay className="size-3.5 shrink-0" aria-hidden="true" />
     </a>
   );
 }
@@ -363,6 +387,7 @@ function KanbanCard({
   isLive,
   subtreeLiveCount = 0,
   pullRequest,
+  runtimeService,
   isOverlay,
   compact = false,
   className,
@@ -372,6 +397,7 @@ function KanbanCard({
   isLive?: boolean;
   subtreeLiveCount?: number;
   pullRequest?: IssuePullRequestSummary;
+  runtimeService?: IssueRuntimeServiceSummary;
   isOverlay?: boolean;
   compact?: boolean;
   className?: string;
@@ -453,8 +479,11 @@ function KanbanCard({
         </div>
         <p className={`${compact ? "mb-1.5 text-xs" : "mb-2 text-sm"} leading-snug line-clamp-2`}>{issue.title}</p>
         <IssueLabelChips labels={issue.labels ?? []} max={3} className={compact ? "mb-1.5" : "mb-2"} />
-        {/* Room for the pull request button, which sits outside the task link. */}
-        <div className={cn("flex items-center gap-2 min-w-0", pullRequest && "pr-16")}>
+        {/* Room for the link buttons, which sit outside the task link. */}
+        <div className={cn(
+          "flex items-center gap-2 min-w-0",
+          pullRequest && runtimeService ? "pr-24" : pullRequest ? "pr-16" : runtimeService ? "pr-8" : null,
+        )}>
           {/* PAP-411: priority UI hidden behind SHOW_TASK_PRIORITY_UI. */}
           {SHOW_TASK_PRIORITY_UI && <PriorityIcon priority={issue.priority} />}
           {issue.assigneeAgentId && (() => {
@@ -469,7 +498,12 @@ function KanbanCard({
           })()}
         </div>
       </Link>
-      {pullRequest ? <PullRequestCardLink pullRequest={pullRequest} compact={compact} /> : null}
+      {pullRequest || runtimeService ? (
+        <div className={cn("absolute flex items-stretch gap-1", compact ? "bottom-2 right-2" : "bottom-2.5 right-2.5")}>
+          {runtimeService ? <RuntimeServiceCardLink service={runtimeService} /> : null}
+          {pullRequest ? <PullRequestCardLink pullRequest={pullRequest} /> : null}
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -533,6 +567,19 @@ export function KanbanBoard({
     () => new Map((pullRequestSummaries ?? []).map((summary) => [summary.issueId, summary])),
     [pullRequestSummaries],
   );
+  // Workspace activity refreshes this at once; services that agents start, or that stop when idle,
+  // send no event, so it also refreshes every minute while the board is open.
+  const { data: runtimeServiceSummaries } = useQuery({
+    queryKey: queryKeys.issues.runtimeServices(companyId ?? "", sortedIssueIds),
+    queryFn: ({ signal }) => issuesApi.runtimeServices(companyId!, sortedIssueIds, { signal }),
+    enabled: Boolean(companyId) && sortedIssueIds.length > 0,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+  const runtimeServices = useMemo(
+    () => new Map((runtimeServiceSummaries ?? []).map((summary) => [summary.issueId, summary])),
+    [runtimeServiceSummaries],
+  );
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as string);
@@ -575,6 +622,7 @@ export function KanbanBoard({
           liveIssueIds={liveIssueIds}
           subtreeLiveCounts={subtreeLiveCounts}
           pullRequests={pullRequests}
+          runtimeServices={runtimeServices}
           compactCards={compactCards}
           // Compact mode also collapses empty lanes to labeled rails.
           collapsed={collapsedStatusSet.has(status) || (collapsedStatusSet.size > 0 && byStatus[status].length === 0)}
@@ -634,7 +682,14 @@ export function KanbanBoard({
         : <div className={cn(contentLayout, "overflow-x-auto pb-4 -mx-2 px-2")}>{content}</div>}
       <DragOverlay>
         {activeIssue ? (
-          <KanbanCard issue={activeIssue} agents={agents} pullRequest={pullRequests.get(activeIssue.id)} isOverlay compact={compactCards} />
+          <KanbanCard
+            issue={activeIssue}
+            agents={agents}
+            pullRequest={pullRequests.get(activeIssue.id)}
+            runtimeService={runtimeServices.get(activeIssue.id)}
+            isOverlay
+            compact={compactCards}
+          />
         ) : null}
       </DragOverlay>
     </DndContext>

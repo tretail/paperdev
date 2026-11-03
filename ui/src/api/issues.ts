@@ -1,6 +1,6 @@
 import type { SetIssueTitle } from "@paperclipai/shared";
-import { ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS, ISSUE_SUMMARIES_MAX_IDS } from "@paperclipai/shared";
-import type { IssuePullRequestSummary, IssueSummary } from "@paperclipai/shared";
+import { ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS, ISSUE_RUNTIME_SERVICE_SUMMARIES_MAX_IDS, ISSUE_SUMMARIES_MAX_IDS } from "@paperclipai/shared";
+import type { IssuePullRequestSummary, IssueRuntimeServiceSummary, IssueSummary } from "@paperclipai/shared";
 import type { ExecutionReconciliation } from "@paperclipai/shared";
 import type {
   AcceptedPlanDecompositionSummary,
@@ -319,6 +319,16 @@ export const issuesApi = {
     for (let start = 0; start < ids.length; start += ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS) {
       const params = new URLSearchParams({ ids: ids.slice(start, start + ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS).join(",") });
       pages.push(api.get<IssuePullRequestSummary[]>(`/companies/${companyId}/issues/pull-requests?${params}`, { ...options, cache: "no-store" }));
+    }
+    return (await Promise.all(pages)).flat();
+  },
+  /** The running preview (or other service with a URL) in each task's own workspace, for board cards. Pages through any number of IDs. */
+  runtimeServices: async (companyId: string, issueIds: readonly string[], options?: RequestOptions): Promise<IssueRuntimeServiceSummary[]> => {
+    const ids = [...new Set(issueIds.map((id) => id.trim().toLowerCase()))].sort();
+    const pages: Promise<IssueRuntimeServiceSummary[]>[] = [];
+    for (let start = 0; start < ids.length; start += ISSUE_RUNTIME_SERVICE_SUMMARIES_MAX_IDS) {
+      const params = new URLSearchParams({ ids: ids.slice(start, start + ISSUE_RUNTIME_SERVICE_SUMMARIES_MAX_IDS).join(",") });
+      pages.push(api.get<IssueRuntimeServiceSummary[]>(`/companies/${companyId}/issues/runtime-services?${params}`, { ...options, cache: "no-store" }));
     }
     return (await Promise.all(pages)).flat();
   },

@@ -501,7 +501,22 @@ repository: Paperclip runs them outside the agents' sandbox.
   hostname to `PAPERCLIP_ALLOWED_HOSTNAMES` (instance `.env`), set
   `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` once you've claimed the board, restart
   it, then run `tailscale serve --bg --https=443 http://127.0.0.1:3100`.
-  Never use Funnel.
+  Under `pnpm dev`, also publish the UI's live-reload socket, which listens on
+  the port 10000 above Paperclip's:
+  `tailscale serve --bg --https=13100 http://127.0.0.1:13100`. Without it the
+  page shows "Paperclip couldn't start" while it loads, and never reloads
+  itself after Vite re-bundles dependencies. Never use Funnel.
+- **Ad blockers:** under `pnpm dev`, the UI loads every app catalog file as
+  its own request, and blockers such as AdBlock answer
+  `app-definitions/mixpanel.json` with an empty response on the tailnet
+  address (not on localhost), so the app never starts. Turn the blocker off for
+  `<Mac>.<tailnet>.ts.net` on each device you use. A built UI bundles these
+  files and isn't affected.
+- **Board cards:** a card shows a preview button while its task's own preview
+  runs, and the preview stops when the task (with its sub-tasks) is done or
+  cancelled. The worktree is still archived later, after the cooldown and the
+  merged PR. A preview you start by hand doesn't stop on its idle timeout,
+  which only counts from the end of an agent run.
 
 ## 8. How the workflow works
 

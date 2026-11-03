@@ -45,7 +45,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { isDeepStrictEqual, promisify } from "node:util";
-import { and, asc, desc, eq, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lte, ne, notInArray, or, sql } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
 import {
   executionWorkspaces,
@@ -78,6 +78,7 @@ import type {
   WorkspaceOverviewQuery,
   GitWorktreeBranchAncestryVerdict,
   IssueRecoveryAction,
+  IssueRuntimeServiceSummary,
 } from "@paperclipai/shared";
 import { deriveProjectUrlKey, WORKSPACE_OVERVIEW_LINKED_ISSUE_LIMIT } from "@paperclipai/shared";
 import { conflict, notFound, unprocessable } from "../errors.js";
@@ -2078,6 +2079,74 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
     return active.length > 0;
   }
 
+  /**
+   * A finished task no longer needs its own preview (or any other runtime service in its isolated
+   * workspace), so stop it once the whole task tree is done or cancelled instead of at the archive,
+   * which waits for the cooldown and a merged PR. The sweep runs this on each inspection of a
+   * terminal tree; once nothing runs it only reads. A queued or running run for the workspace or
+   * any task in the tree keeps the services, as it does for compaction: releasing a task wakes the
+   * sweep, and otherwise the sweep's next deadline retries.
+   */
+  async function stopRuntimeServicesForTerminalTaskWorkspace(
+    workspace: ExecutionWorkspaceRow,
+    treeIssueIds: readonly string[],
+  ) {
+    if (workspace.mode !== "isolated_workspace") return false;
+    const active = await db
+      .select({ serviceName: workspaceRuntimeServices.serviceName })
+      .from(workspaceRuntimeServices)
+      .where(and(
+        eq(workspaceRuntimeServices.companyId, workspace.companyId),
+        eq(workspaceRuntimeServices.executionWorkspaceId, workspace.id),
+        inArray(workspaceRuntimeServices.status, ["provisioning", "starting", "running"]),
+      ));
+    if (active.length === 0) return false;
+    // Another open task can reuse this workspace, and its review may need the preview.
+    const [openTask] = await db
+      .select({ id: issues.id })
+      .from(issues)
+      .where(and(
+        eq(issues.companyId, workspace.companyId),
+        eq(issues.executionWorkspaceId, workspace.id),
+        notInArray(issues.status, [...TERMINAL_ISSUE_STATUSES]),
+      ))
+      .limit(1);
+    if (openTask) return false;
+    if (await workspaceHasActiveRun(workspace)) return false;
+    if (treeIssueIds.length > 0) {
+      const [treeRun] = await db
+        .select({ id: heartbeatRuns.id })
+        .from(heartbeatRuns)
+        .where(and(
+          eq(heartbeatRuns.companyId, workspace.companyId),
+          inArray(heartbeatRuns.status, ["queued", "running"]),
+          sql`coalesce(
+            ${heartbeatRuns.nativeIssueId}::text,
+            nullif(${heartbeatRuns.contextSnapshot}->>'issueId', ''),
+            nullif(${heartbeatRuns.contextSnapshot}->>'taskId', '')
+          ) IN (${sql.join(treeIssueIds.map((id) => sql`${id}`), sql`, `)})`,
+        ))
+        .limit(1);
+      if (treeRun) return false;
+    }
+    const { stopRuntimeServicesForExecutionWorkspace } = await import("./workspace-runtime.js");
+    await stopRuntimeServicesForExecutionWorkspace({ db, executionWorkspaceId: workspace.id });
+    await logActivity(db, {
+      companyId: workspace.companyId,
+      actorType: "system",
+      actorId: "workspace_terminality_reaper",
+      action: "execution_workspace.runtime_stop",
+      entityType: "execution_workspace",
+      entityId: workspace.id,
+      details: {
+        reason: "issue_terminal",
+        sourceIssueId: workspace.sourceIssueId,
+        serviceNames: [...new Set(active.map((service) => service.serviceName))],
+      },
+    });
+    return true;
+  }
+
   type FenceableWorkspaceRow = {
     status: string;
     metadata: Record<string, unknown> | null;
@@ -2629,6 +2698,42 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
     prepareConfiguredRepositoryCopy: executionWorkspaceRepositoryService(db).prepareConfiguredRepositoryCopy,
     assertTaskRepositoryRecoveryBinding: executionWorkspaceRepositoryService(db).assertRecoveryBinding,
     resolveSourceWorkspaceStrategy, validateSelection, validateStoredSelectionForRun, inspectTaskWorkspace, selectTaskWorkspace, applyPendingTaskWorkspaceSelection, bindTaskWorkspace, prepareTaskWorkspaceUpdate, assertTaskWorkspaceUpdateAccess,
+    /** For board cards: the first running service with a URL in each task's own isolated workspace,
+     * such as its preview. A shared workspace runs in the project's checkout, so its services belong
+     * to the project, not the task, and are left out. Callers pass only issue IDs the actor may read. */
+    runningServiceLinksForIssues: async (
+      companyId: string,
+      issueIds: readonly string[],
+      readCondition?: SQL<boolean>,
+    ): Promise<IssueRuntimeServiceSummary[]> => {
+      if (issueIds.length === 0) return [];
+      const linked = await db
+        .select({ issueId: issues.id, executionWorkspaceId: issues.executionWorkspaceId })
+        .from(issues)
+        .where(and(eq(issues.companyId, companyId), inArray(issues.id, [...issueIds])));
+      const workspaceIds = [...new Set(linked.flatMap((row) => row.executionWorkspaceId ? [row.executionWorkspaceId] : []))];
+      if (workspaceIds.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(executionWorkspaces)
+        .where(and(
+          eq(executionWorkspaces.companyId, companyId),
+          inArray(executionWorkspaces.id, workspaceIds),
+          eq(executionWorkspaces.mode, "isolated_workspace"),
+          readCondition,
+        ));
+      const servicesByWorkspace = await loadEffectiveRuntimeServicesByExecutionWorkspace(db, companyId, rows);
+      const linkByWorkspace = new Map<string, { serviceName: string; url: string }>();
+      for (const row of rows) {
+        const service = (servicesByWorkspace.get(row.id) ?? []).find((candidate) =>
+          candidate.executionWorkspaceId === row.id && candidate.status === "running" && Boolean(candidate.url));
+        if (service?.url) linkByWorkspace.set(row.id, { serviceName: service.serviceName, url: service.url });
+      }
+      return linked.flatMap((row) => {
+        const link = row.executionWorkspaceId ? linkByWorkspace.get(row.executionWorkspaceId) : undefined;
+        return link ? [{ issueId: row.issueId, ...link }] : [];
+      });
+    },
     listOverview: async (
       companyId: string,
       filters: WorkspaceOverviewQuery,
@@ -3600,6 +3705,18 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
         }
         const expirationTerminalAt = Math.max(...expirationTree.map(issue => issueTerminalTimestamp(issue)!.getTime()));
         const latestTerminalAt = treeOpen ? expirationTerminalAt : Math.max(...issueTree.map(issue => issueTerminalTimestamp(issue)!.getTime()));
+        // Services stop with the task; the workspace itself waits for the archive conditions below.
+        if (!treeOpen && !reopenPending && !isClosedExecutionWorkspaceStatus(workspace.status)) {
+          try {
+            await stopRuntimeServicesForTerminalTaskWorkspace(workspace, issueTree.map((issue) => issue.id));
+          } catch (error) {
+            if (signal?.aborted) throw error;
+            logger.warn(
+              { err: error, executionWorkspaceId: workspace.id, sourceIssueId: workspace.sourceIssueId },
+              "stopping a finished task's runtime services failed; a later sweep retries",
+            );
+          }
+        }
         if (opts.taskDirectoryRetention && !treeOpen && !reopenPending && !isClosedExecutionWorkspaceStatus(workspace.status)
           && mayBeIsolatedTaskDirectoryWorkspace(workspace) && await isIsolatedTaskDirectoryWorkspace(workspace)) {
           const dueAt = latestTerminalAt + opts.taskDirectoryRetention.terminalDelayMs;

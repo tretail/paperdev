@@ -374,6 +374,9 @@ export const queryKeys = {
       ["issues", companyId, "summaries", userId ?? "__local_board__", sortedIds] as const,
     pullRequests: (companyId: string, sortedIds: readonly string[]) =>
       ["issues", companyId, "pull-requests", sortedIds] as const,
+    runtimeServices: (companyId: string, sortedIds: readonly string[]) =>
+      ["issues", companyId, "runtime-services", sortedIds] as const,
+    runtimeServicesAll: (companyId: string) => ["issues", companyId, "runtime-services"] as const,
     detail: (id: string) => ["issues", "detail", id] as const,
     comments: (issueId: string) => ["issues", "comments", issueId] as const,
     commentsList: (issueId: string) =>

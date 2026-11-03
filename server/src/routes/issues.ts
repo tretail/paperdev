@@ -8,9 +8,12 @@ import { parseObject } from "../adapters/utils.js";
 import { prepareRestrictedWorkspaceRetry } from "../services/restricted-workspace-retry.js";
 import {
   ISSUE_PULL_REQUEST_SUMMARIES_MAX_IDS,
+  ISSUE_RUNTIME_SERVICE_SUMMARIES_MAX_IDS,
   issuePullRequestSummariesQuerySchema,
+  issueRuntimeServiceSummariesQuerySchema,
   issueSummariesQuerySchema,
   type IssuePullRequestSummary,
+  type IssueRuntimeServiceSummary,
   type IssueSummary,
 } from "@paperclipai/shared";
 import { listIssueSummaries } from "../services/issue-summaries.js";
@@ -323,6 +326,7 @@ import {
 } from "../services/issues.js";
 import {
   authorizationDeniedDetails,
+  executionWorkspaceReadSqlCondition,
   issueReadSqlCondition,
   projectReadSqlCondition,
 } from "../services/authorization.js";
@@ -8409,6 +8413,33 @@ export function issueRoutes(
     );
     const visible = await filterIssuesForActor(req, rows);
     const summaries: IssuePullRequestSummary[] = await workProductsSvc.pullRequestSummaries(companyId, visible.map((row) => row.id));
+    res.setHeader("Cache-Control", "private, no-store");
+    res.json(summaries);
+  });
+
+  // The running preview (or other service with a URL) in each task's own workspace, for board
+  // cards. Only tasks the actor can read, in workspaces the actor can read.
+  router.get("/companies/:companyId/issues/runtime-services", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    assertCompanyAccess(req, companyId);
+    if (isTaskBridgeKeyActor(req)) {
+      res.status(403).json({ error: "Task bridge keys cannot use company-wide issue list APIs" });
+      return;
+    }
+    const parsed = issueRuntimeServiceSummariesQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: `ids must be the only query parameter and contain one to ${ISSUE_RUNTIME_SERVICE_SUMMARIES_MAX_IDS} comma-separated UUIDs`,
+      });
+      return;
+    }
+    const rows = await listIssueSummaries(
+      db, companyId, parsed.data.ids, await issueReadSqlCondition(db, req.actor), ISSUE_RUNTIME_SERVICE_SUMMARIES_MAX_IDS,
+    );
+    const visible = await filterIssuesForActor(req, rows);
+    const summaries: IssueRuntimeServiceSummary[] = await executionWorkspacesSvc.runningServiceLinksForIssues(
+      companyId, visible.map((row) => row.id), await executionWorkspaceReadSqlCondition(db, req.actor),
+    );
     res.setHeader("Cache-Control", "private, no-store");
     res.json(summaries);
   });

@@ -332,6 +332,13 @@ export interface WorkspaceRuntimeService {
   updatedAt: Date;
 }
 
+/** A running service with a URL in a task's own workspace, such as a preview, as a board card shows it. */
+export interface IssueRuntimeServiceSummary {
+  issueId: string;
+  serviceName: string;
+  url: string;
+}
+
 export type WorkspaceRealizationMode = "copy" | "in_place";
 
 export interface WorkspaceRealizationPathAlias {

@@ -46,6 +46,19 @@ describe("LiveUpdatesProvider issue invalidation", () => {
     expect(client.getQueryData(taskRecordKey)).toBeUndefined();
     client.clear();
   });
+  it.each(["execution_workspace.runtime_start", "execution_workspace.runtime_stop"])("refreshes board preview links after %s", action => {
+    const client = new QueryClient();
+    const boardKey = queryKeys.issues.runtimeServices("company-1", ["issue-1", "issue-2"]);
+    const otherCompanyKey = queryKeys.issues.runtimeServices("company-2", ["issue-3"]);
+    client.setQueryData(boardKey, [{ issueId: "issue-1", serviceName: "Preview", url: "https://mini.example.ts.net:5173" }]);
+    client.setQueryData(otherCompanyKey, []);
+    __liveUpdatesTestUtils.invalidateActivityQueries(client, "company-1", {
+      entityType: "execution_workspace", entityId: "workspace-1", action, actorType: "system",
+    }, { userId: "user-1", agentId: null });
+    expect(client.getQueryState(boardKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(otherCompanyKey)?.isInvalidated).toBe(false);
+    client.clear();
+  });
   it("refreshes saved project access with permission saves and live agent activity", async () => {
     const client = new QueryClient();
     const target = queryKeys.agents.projectAccess("agent-1");

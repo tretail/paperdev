@@ -16,7 +16,7 @@ Agent access: [companion](../agent-access-map/workspaces.md).
 
 - `binding`: `workspaces/binding` — identify the workspace actually bound to a task/run.
 - `provisioning`: `workspaces/provisioning` — observe readiness and failures instead of inferring readiness from a created record.
-- `services`: `workspaces/services` — start/stop supported services and inspect logs and exposed endpoints.
+- `services`: `workspaces/services` — start/stop supported services and inspect logs and exposed endpoints. A board card links to its task's running service, and a task's own services stop once its task tree is done or cancelled.
 - `files-git`: `workspaces/files-git` — inspect workspace files and repository state used for the deliverable.
 - `closure`: `workspaces/closure` — close/reopen or reconcile through permitted controls without losing work.
 
@@ -147,6 +147,8 @@ For a child created by an admitted agent with an explicit existing workspace, ve
 Automated: [workspace detail](../../ui/src/pages/ExecutionWorkspaceDetail.test.tsx) and [runtime service](../../server/src/__tests__/workspace-runtime.test.ts) cover UI and runtime contracts separately.
 
 Manual: Provision a disposable workspace, wait for readiness, start an available service, open its endpoint, and inspect a real response and logs. Stop it and verify it actually stops. Exercise close/reopen only after inspecting pending changes and active runs.
+
+Board links and the stop on completion: the [route tests](../../server/src/__tests__/issue-runtime-service-summaries-routes.test.ts) cover which tasks get a link, the [board tests](../../ui/src/components/KanbanBoard.test.tsx) cover the card button, and the [sweep tests](../../server/src/__tests__/terminal-workspace-runtime-stop.test.ts) cover stopping a finished task's isolated-workspace services while open sub-tasks, reusing tasks, active runs and shared workspaces keep theirs. Manually, start a task's preview, see the card's button open it, move the task to Done and check the port closes. The workspace itself still waits for the archive cooldown.
 
 ## Gotchas
 

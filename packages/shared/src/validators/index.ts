@@ -427,6 +427,7 @@ export {
   createIssueSchema,
   issueSummariesQuerySchema,
   issuePullRequestSummariesQuerySchema,
+  issueRuntimeServiceSummariesQuerySchema,
   setIssueTitleSchema,
   type SetIssueTitle,
   createIssueInputSchema,
