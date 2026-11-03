@@ -446,10 +446,36 @@ export async function readLocalServiceProcessGroupId(pid: number) {
   }
 }
 
+/** Whether `ancestorPid` is a parent, grandparent, ... of `pid`, from one `ps` snapshot. */
+async function isLocalServiceProcessDescendantOf(pid: number, ancestorPid: number) {
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync("ps", ["-A", "-o", "pid=,ppid="]));
+  } catch {
+    return false;
+  }
+  const parentByPid = new Map<number, number>();
+  for (const line of stdout.split("\n")) {
+    const [child, parent] = line.trim().split(/\s+/).map((value) => Number.parseInt(value, 10));
+    if (Number.isInteger(child) && Number.isInteger(parent)) parentByPid.set(child!, parent!);
+  }
+  // Bounded: a pid reused while the snapshot was taken cannot loop forever.
+  let current = parentByPid.get(pid);
+  for (let depth = 0; current !== undefined && current > 1 && depth < 256; depth += 1) {
+    if (current === ancestorPid) return true;
+    current = parentByPid.get(current);
+  }
+  return false;
+}
+
 export async function isLocalServiceProcessOwnedBy(pid: number, ownerProcessId: number) {
   if (pid === ownerProcessId) return true;
   if (process.platform !== "win32") {
-    return (await readLocalServiceProcessGroupId(pid)) === ownerProcessId;
+    if ((await readLocalServiceProcessGroupId(pid)) === ownerProcessId) return true;
+    // A launcher can run the real listener in a process group of its own: Turbo starts each task
+    // in a new group. That listener is still the launched service's descendant, and on Windows
+    // ancestry is already the only test.
+    return isLocalServiceProcessDescendantOf(pid, ownerProcessId);
   }
 
   try {

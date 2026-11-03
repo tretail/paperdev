@@ -12,8 +12,10 @@ import {
 import {
   doesLocalServiceCommandLineMatch,
   isLocalServiceCommandLineComparable,
+  isLocalServiceProcessOwnedBy,
   listLocalServiceRegistryRecords,
   readLocalServicePortOwner,
+  readLocalServiceProcessGroupId,
   resolveLocalServiceLogPath,
   terminateLocalService,
 } from "../services/local-service-supervisor.js";
@@ -169,5 +171,37 @@ describe("local service supervision", () => {
       recordedCommand: "node ./server.js",
       serviceName: "web",
     })).toBe(false);
+  });
+
+  // Turbo runs each task in a process group of its own, so a monorepo's dev server listens from
+  // outside the group Paperclip launched. It is still that launch's descendant.
+  it.skipIf(process.platform === "win32")("owns a listener a descendant runs in its own process group", async () => {
+    const launcherScript = [
+      "const { spawn } = require('node:child_process');",
+      "const server = \"require('node:http').createServer((q, s) => s.end('ok')).listen(0, '127.0.0.1', function () { console.log(this.address().port); })\";",
+      "const child = spawn(process.execPath, ['-e', server], { detached: true, stdio: ['ignore', 'inherit', 'inherit'] });",
+      "process.on('SIGTERM', () => { try { process.kill(-child.pid, 'SIGTERM'); } catch {} process.exit(0); });",
+      "setInterval(() => {}, 1000);",
+    ].join("\n");
+    const launcher = spawn(process.execPath, ["-e", launcherScript], { detached: true, stdio: ["ignore", "pipe", "inherit"] });
+    const unrelated = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { detached: true, stdio: "ignore" });
+    try {
+      const port = await new Promise<number>((resolve, reject) => {
+        launcher.stdout!.once("data", (chunk) => resolve(Number.parseInt(String(chunk).trim(), 10)));
+        launcher.once("exit", () => reject(new Error("launcher exited before its listener started")));
+      });
+      const listenerPid = await readLocalServicePortOwner(port);
+      expect(listenerPid).not.toBeNull();
+      expect(listenerPid).not.toBe(launcher.pid);
+      // The precondition this test is about: the listener left the launched process group.
+      expect(await readLocalServiceProcessGroupId(listenerPid!)).not.toBe(launcher.pid);
+
+      await expect(isLocalServiceProcessOwnedBy(listenerPid!, launcher.pid!)).resolves.toBe(true);
+      await expect(isLocalServiceProcessOwnedBy(listenerPid!, unrelated.pid!)).resolves.toBe(false);
+    } finally {
+      for (const pid of [launcher.pid, unrelated.pid]) {
+        try { process.kill(-pid!, "SIGTERM"); } catch { /* already gone */ }
+      }
+    }
   });
 });
