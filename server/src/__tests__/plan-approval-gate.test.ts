@@ -237,6 +237,44 @@ describeEmbeddedPostgres("plan approval gate", () => {
     expect(await check(fixture.implementerId, boundPlannerRun)).toMatchObject({ allowed: false });
   });
 
+  it("binds native planning checkout to the live prepared task, mode and identity", async () => {
+    const fixture = await seed();
+    await db.update(agents).set({ adapterType: "paperclip_runner", adapterConfig: { provider: "codex" } }).where(eq(agents.id, fixture.codexId));
+    const id = randomUUID();
+    const execution = {
+      binding: { runId: id, agentId: fixture.codexId, companyId: fixture.companyId, issueId: fixture.issueId },
+      executionMode: "plan", task: { workMode: "planning" }, provider: { kind: "codex" },
+      planningContext: { markdown: "", baseRevisionId: null },
+    };
+    await db.insert(heartbeatRuns).values({ id, companyId: fixture.companyId, agentId: fixture.codexId,
+      status: "running", contextSnapshot: { issueId: fixture.issueId }, runnerProfileJson: { nativeExecutionInput: execution } });
+    const check = () => planGateAllowsAgentCheckout(db, { ...fixture, agentId: fixture.codexId, checkoutRunId: id });
+    expect(await check()).toEqual({ allowed: true });
+    // Real harness ordering: checkout precedes preparation of native input.
+    await db.update(heartbeatRuns).set({ runnerProfileJson: null }).where(eq(heartbeatRuns.id, id));
+    expect(await check()).toEqual({ allowed: true });
+    await db.update(heartbeatRuns).set({ contextSnapshot: { issueId: randomUUID() } }).where(eq(heartbeatRuns.id, id));
+    expect(await check()).toMatchObject({ allowed: false });
+    await db.update(heartbeatRuns).set({ contextSnapshot: { issueId: fixture.issueId }, runnerProfileJson: { nativeExecutionInput: null } }).where(eq(heartbeatRuns.id, id));
+    expect(await check()).toMatchObject({ allowed: false });
+    await db.update(heartbeatRuns).set({ runnerProfileJson: { nativeExecutionInput: execution } }).where(eq(heartbeatRuns.id, id));
+    for (const binding of [
+      { ...execution.binding, companyId: randomUUID() },
+      { ...execution.binding, issueId: randomUUID() },
+      { ...execution.binding, agentId: fixture.plannerId },
+      { ...execution.binding, runId: randomUUID() },
+    ]) {
+      await db.update(heartbeatRuns).set({ runnerProfileJson: { nativeExecutionInput: { ...execution, binding } } }).where(eq(heartbeatRuns.id, id));
+      expect(await check()).toMatchObject({ allowed: false });
+    }
+    await db.update(heartbeatRuns).set({ runnerProfileJson: { nativeExecutionInput: execution } }).where(eq(heartbeatRuns.id, id));
+    await db.update(issues).set({ workMode: "standard" }).where(eq(issues.id, fixture.issueId));
+    expect(await check()).toMatchObject({ allowed: false });
+    await db.update(issues).set({ workMode: "planning" }).where(eq(issues.id, fixture.issueId));
+    await db.update(heartbeatRuns).set({ status: "succeeded" }).where(eq(heartbeatRuns.id, id));
+    expect(await check()).toMatchObject({ allowed: false });
+  });
+
   it("allows any checkout once the current plan is approved", async () => {
     const fixture = await seed();
     const { revisionId } = await writePlan(fixture, 1);

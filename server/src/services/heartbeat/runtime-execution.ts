@@ -511,7 +511,7 @@ export async function executeHeartbeatRuntime(db: Db, input: HeartbeatRuntimeExe
   // The plan approval gate is evaluated here, at dispatch, so retries,
   // recovery, and resumed runs all observe the current plan approval state.
   const planGateDecision = issueRef
-    ? decidePlanGateRun(await evaluatePlanApproval(db, { companyId: agent.companyId, issueId: issueRef.id }), agent)
+    ? decidePlanGateRun(await evaluatePlanApproval(db, { companyId: agent.companyId, issueId: issueRef.id }), agent, { workMode: issueRef.workMode, nativeExecution })
     : ({ kind: "ungated" } as const);
   const planGateContext = issueRef ? planGateContextFor(issueRef.id, planGateDecision) : null;
   try {

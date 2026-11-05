@@ -171,9 +171,27 @@ export async function evaluatePlanApproval(
  * Decide what a run may do. Unapproved runs are allowed only on adapters that
  * enforce a read-only planning profile; every other adapter is blocked.
  */
+type PlanningExecution = { workMode: string; nativeExecution?: unknown };
+
+function record(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : {};
+}
+
+/** Native tool authority and provider permissions both derive from this prepared mode. */
+function isNativeReadOnlyPlan(planning?: PlanningExecution): boolean {
+  const execution = record(planning?.nativeExecution);
+  return planning?.workMode === "planning"
+    && record(execution.task).workMode === "planning"
+    && execution.executionMode === "plan"
+    && record(execution.provider).kind === "codex"
+    && Object.keys(record(execution.planningContext)).length > 0;
+}
+
 export function decidePlanGateRun(
   evaluation: PlanApprovalEvaluation,
   agent: { adapterType: string | null },
+  planning?: PlanningExecution,
 ): PlanGateRunDecision {
   if (!evaluation.required) return { kind: "ungated" };
   if (evaluation.approved) {
@@ -183,13 +201,14 @@ export function decidePlanGateRun(
       approvedRevisionNumber: evaluation.planRevisionNumber,
     };
   }
-  if (READ_ONLY_PLANNING_ADAPTER_TYPES.has(agent.adapterType ?? "")) return { kind: "plan" };
+  if (READ_ONLY_PLANNING_ADAPTER_TYPES.has(agent.adapterType ?? "")
+    || (agent.adapterType === "paperclip_runner" && isNativeReadOnlyPlan(planning))) return { kind: "plan" };
   return {
     kind: "blocked",
     reason:
       `This task requires an approved plan before implementation (${describePlanApprovalGap(evaluation)}), ` +
       `and the ${agent.adapterType ?? "unknown"} adapter cannot run it read-only. ` +
-      "Approve the current plan revision, or assign planning to a claude_local agent.",
+      "Approve the current plan revision, use a managed Codex task in planning mode, or assign planning to a claude_local agent.",
   };
 }
 
@@ -232,9 +251,10 @@ export async function planGateAllowsAgentCheckout(
   if (!evaluation.required || evaluation.approved) return { allowed: true };
   if (!input.checkoutRunId) return { allowed: false, evaluation };
   const [run] = await db
-    .select({ issueId: heartbeatRuns.issueId, contextSnapshot: heartbeatRuns.contextSnapshot, adapterType: agents.adapterType })
+    .select({ issueId: heartbeatRuns.issueId, contextSnapshot: heartbeatRuns.contextSnapshot, adapterType: agents.adapterType, runnerProfileJson: heartbeatRuns.runnerProfileJson, status: heartbeatRuns.status, workMode: issues.workMode, adapterConfig: agents.adapterConfig })
     .from(heartbeatRuns)
     .innerJoin(agents, and(eq(agents.id, heartbeatRuns.agentId), eq(agents.companyId, heartbeatRuns.companyId)))
+    .innerJoin(issues, and(eq(issues.id, input.issueId), eq(issues.companyId, heartbeatRuns.companyId)))
     .where(and(
       eq(heartbeatRuns.id, input.checkoutRunId),
       eq(heartbeatRuns.companyId, input.companyId),
@@ -244,5 +264,19 @@ export async function planGateAllowsAgentCheckout(
   const runIssueId = typeof run?.contextSnapshot?.issueId === "string" ? run.contextSnapshot.issueId : run?.issueId;
   const confined = Boolean(run) && runIssueId === input.issueId &&
     READ_ONLY_PLANNING_ADAPTER_TYPES.has(run!.adapterType ?? "");
-  return confined ? { allowed: true } : { allowed: false, evaluation };
+  const nativeExecution = record(run?.runnerProfileJson?.nativeExecutionInput);
+  const binding = record(nativeExecution.binding);
+  // The harness claims the task before it prepares native execution. This claim
+  // grants no provider/tool access: dispatch must still prove read-only plan mode.
+  // Once prepared input exists, recovery and later checkouts must match it exactly.
+  const nativeClaim = run?.adapterType === "paperclip_runner" && run.status === "running"
+    && run.workMode === "planning" && runIssueId === input.issueId
+    && record(run.adapterConfig).provider === "codex";
+  const hasPreparedInput = Object.prototype.hasOwnProperty.call(record(run?.runnerProfileJson), "nativeExecutionInput");
+  const nativeConfined = nativeClaim && (!hasPreparedInput || (
+    isNativeReadOnlyPlan({ workMode: run?.workMode ?? "standard", nativeExecution })
+    && binding.companyId === input.companyId && binding.issueId === input.issueId
+    && binding.agentId === input.agentId && binding.runId === input.checkoutRunId
+  ));
+  return confined || nativeConfined ? { allowed: true } : { allowed: false, evaluation };
 }
