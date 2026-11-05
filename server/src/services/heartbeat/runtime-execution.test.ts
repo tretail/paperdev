@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { agents, companies, createDb, EMBEDDED_POSTGRES_TEST_TIMEOUT_MS, heartbeatRuns, issues, executionWorkspaces, nativeRunFinalizations, runUsageReceipts, workspaceOperations, type Db } from "@paperclipai/db";
+import { agents, companies, projects, createDb, EMBEDDED_POSTGRES_TEST_TIMEOUT_MS, heartbeatRuns, issues, executionWorkspaces, nativeRunFinalizations, runUsageReceipts, workspaceOperations, type Db } from "@paperclipai/db";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { trace } from "@opentelemetry/api";
@@ -60,10 +60,10 @@ describe.skipIf(!support.supported)("heartbeat runtime execution boundary", () =
     vi.mocked(executePaperclipNativeSession).mockResolvedValue({ exitCode: 0, signal: null, timedOut: false });
   });
 
-  async function fixture(native = false, provider: "codex" | "grok_bot" | "openai_dot" = "codex") {
+  async function fixture(native = false, provider: "codex" | "grok_bot" | "openai_dot" = "codex", workMode: "standard" | "planning" = "standard") {
     const [company] = await db.insert(companies).values({ name: "Runtime execution", issuePrefix: "EXE" }).returning();
     const [agent] = await db.insert(agents).values({ companyId: company.id, name: "Executing agent", status: "running", adapterType: native ? "paperclip_runner" : "process", adapterConfig: provider === "codex" ? { provider } : { provider, lifecycleMode: "per_turn", allowUnmeteredProvider: true, [provider === "grok_bot" ? "externalBindingId" : "dotBindingId"]: randomUUID() } }).returning();
-    const [issue] = await db.insert(issues).values({ companyId: company.id, title: "Complete this task", assigneeAgentId: agent.id }).returning();
+    const [issue] = await db.insert(issues).values({ companyId: company.id, title: "Complete this task", workMode, assigneeAgentId: agent.id }).returning();
     const [run] = await db.insert(heartbeatRuns).values({ companyId: company.id, agentId: agent.id, issueId: issue.id, scopeKind: "issue", status: "running", runtimeMode: native ? "native" : "legacy" }).returning();
     const state = createHeartbeatRunState(db);
     const executionControl = createAdapterExecutionControl();
@@ -71,6 +71,7 @@ describe.skipIf(!support.supported)("heartbeat runtime execution boundary", () =
     let instructionSave: Record<string, unknown> | null = null;
     const nativeExecution = native ? buildNativeExecutionInput({
       companyId: company.id, agentId: agent.id, runId: run.id, issue,
+      planningContext: workMode === "planning" ? { documentId: null, baseRevisionId: null, baseRevisionNumber: 0, markdown: "", sha256: "a".repeat(64), reviewContext: {} } : null,
       taskPrompt: issue.title, workspace: { id: run.id, cwd: home, repoUrl: null, repoRef: null, branchName: null },
       normalizedSessionId: null, provider, runtimeContext: nativeRuntimeContextFixture(),
       dotBinding: { bindingId: randomUUID(), bindingGeneration: 1, companyId: company.id, agentId: agent.id, acceptByUnixMs: Date.now() + 60_000, expiresAtUnixMs: Date.now() + 120_000 },
@@ -117,6 +118,21 @@ describe.skipIf(!support.supported)("heartbeat runtime execution boundary", () =
     expect(revokeHeartbeatRunGatewayTokens).toHaveBeenCalledWith({ db, companyId: input.agent.companyId, runId: input.run.id });
     expect(input.instructions.releaseInstructionCopy).toHaveBeenCalledOnce();
   }
+
+  it.each(["planning", "standard"] as const)("gated Codex dispatch enforces prepared %s mode", async workMode => {
+    const { input } = await fixture(true, "codex", workMode);
+    const [project] = await db.insert(projects).values({ companyId: input.agent.companyId, name: "Gated", planApprovalPolicy: { enabled: true } }).returning();
+    await db.update(issues).set({ projectId: project.id }).where(eq(issues.id, input.task.issueId!));
+    const result = await executeHeartbeatRuntime(db, input);
+    if (workMode === "planning") {
+      expect(result).toMatchObject({ dispatched: true, adapterResult: { exitCode: 0 } });
+      expect(executePaperclipNativeSession).toHaveBeenCalledOnce();
+      expect(input.runtime.nativeExecution).toMatchObject({ executionMode: "plan", task: { workMode: "planning" } });
+    } else {
+      expect(result).toMatchObject({ dispatched: true, adapterResult: { errorCode: "plan_approval_required" } });
+      expect(executePaperclipNativeSession).not.toHaveBeenCalled();
+    }
+  });
 
   it.each([false, true])("preserves the dispatch gate's early return and cleanup (native: %s)", async native => {
     const { input, adapter } = await fixture(native);
