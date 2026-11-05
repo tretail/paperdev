@@ -109,7 +109,8 @@ set_env() {
 case "$action" in
   provision)
     worktree_names
-    [ -f .env ] || cp .env.example .env
+    # An app without .env.example (Patlynk) starts from an empty .env.
+    [ -f .env ] || { [ -f .env.example ] && cp .env.example .env; } || : >.env
     if ! exists "$db"; then
       if exists "$template"; then
         # A clone fails while another session uses the template; provisions can overlap.

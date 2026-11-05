@@ -5,6 +5,8 @@
 #     --password particups [--restore <file from pg_dump -Fc>]
 #   postgres-server.sh --name tablebear --version 18 --port 5434 --role app --password app \
 #     --role-attrs "CREATEDB BYPASSRLS" --init-sql tools/db/native-roles.sql --max-connections 400
+#   postgres-server.sh --name patlynk --version 18 --port 5435 --role patlynk --password patlynk \
+#     --init-sql backend/database/native-setup.sql
 #
 # Loopback only, and a password on every connection. With Postgres.app's default trust rules,
 # any local process could log in as a superuser and run commands as you (COPY ... PROGRAM),
@@ -13,9 +15,10 @@
 # owns <name> and <name>_test, and worktree-db.sh clones databases with it.
 #
 # --role-attrs adds attributes to the app role; only CREATEDB, BYPASSRLS and CREATEROLE are
-# accepted, never SUPERUSER. --init-sql runs a file as the superuser once, after the role exists:
-# for what the app role can't do itself, such as creating the roles its migrations expect. Read
-# the file first: it runs with full rights. --max-connections raises Postgres's default of 100,
+# accepted, never SUPERUSER. --init-sql runs a file as the superuser once, after the role exists
+# and before the databases: for what the app role can't do itself, such as creating the roles its
+# migrations expect, or untrusted extensions in template1. Read the file first: it runs with full
+# rights. --max-connections raises Postgres's default of 100,
 # for test suites that open many pools; every worktree's tests share the server.
 #
 # It uses Postgres.app's binaries, but Postgres.app's window doesn't list the server.
@@ -119,14 +122,17 @@ until "$bin/pg_isready" -q -h 127.0.0.1 -p "$port"; do
 done
 
 "$bin/psql" -h 127.0.0.1 -p "$port" -U postgres -d postgres -w -XAtq -v ON_ERROR_STOP=1 \
-  -c "CREATE ROLE $role LOGIN PASSWORD '$password' $role_attrs" \
-  -c "CREATE DATABASE $name OWNER $role" \
-  -c "CREATE DATABASE ${name}_test OWNER $role"
+  -c "CREATE ROLE $role LOGIN PASSWORD '$password' $role_attrs"
 
+# Before the databases: what it puts in template1 (extensions, say) then reaches them too.
 if [ -n "$init_sql" ]; then
   "$bin/psql" -h 127.0.0.1 -p "$port" -U postgres -d postgres -w -Xq -v ON_ERROR_STOP=1 -f "$init_sql"
   echo "ran $init_sql as the superuser"
 fi
+
+"$bin/psql" -h 127.0.0.1 -p "$port" -U postgres -d postgres -w -XAtq -v ON_ERROR_STOP=1 \
+  -c "CREATE DATABASE $name OWNER $role" \
+  -c "CREATE DATABASE ${name}_test OWNER $role"
 
 if [ -n "$restore" ]; then
   PGPASSWORD=$password "$bin/pg_restore" -h 127.0.0.1 -p "$port" -U "$role" -d "$name" \

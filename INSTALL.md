@@ -489,9 +489,11 @@ repository: Paperclip runs them outside the agents' sandbox.
   sandbox like the agents': its own company folder only, no secrets, writes
   only in the worktree, no internet. An app that needs more than one step
   gets its own wrapper: `tablebear-preview.sh` (Spring backend and Vite app,
-  with the app starting once the backend answers) and `particups-preview.sh`
+  with the app starting once the backend answers), `particups-preview.sh`
   (an offline `pnpm install` from the agents' store when the worktree has no
-  `node_modules`, then `pnpm dev`). A wrapper must not
+  `node_modules`, then `pnpm dev`) and `patlynk-preview.sh` (Spring backend
+  and the patient site; anonymous pages only, since login needs the staging
+  Supabase and the preview has no internet). A wrapper must not
   `exec` into another program. When Paperclip restarts, it adopts a running
   preview only if the process it started still shows the service's command.
   Otherwise it starts a second copy and leaves the first one running.
