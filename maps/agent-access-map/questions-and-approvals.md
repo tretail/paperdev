@@ -302,7 +302,7 @@ API: `present` — GET /api/issues/{id}/documents/plan; PUT /api/issues/{id}/doc
 
 Agent access: `available` — native list/read/write_document + request_human_input when actual mode/profile admits; direct REST/CLI supported fields.
 
-Policy: Document ACL/version gates; request insert validates current target revision atomically. Native supplied targetRevisionId infers own plan target only for planning confirmation; otherwise full target required. Stable revision-specific key. Product Chat Ask discussion does not authorize plan/task writes.
+Policy: Document ACL/version gates; request insert validates current target revision atomically. Native supplied targetRevisionId infers own plan target only for planning confirmation; otherwise full target required. Stable revision-specific key. Product Chat Ask discussion does not authorize plan/task writes. Native managed Codex may draft under a project approval gate only for an explicit planning task with a prepared plan-mode input and pinned planning context. Its workspace/tools stay read-only; the initial claim requires a live task-bound managed Codex run, and prepared checkout requires its exact company/task/agent/run binding. Unapproved standard native execution remains denied.
 
 Evidence: `source-only` — [interaction service](../../server/src/services/issue-thread-interactions.ts), [native authority](../../server/src/services/native-runtime/paperclip-runner-tool-authority.ts), [chat directive](../../server/src/services/agent-conversations.ts); reviewed at `3bbc2104b65caf9f7763938a01260a5673e12f7a`. No live proof.
 
