@@ -287,7 +287,10 @@ describe("KanbanBoard", () => {
     }];
     runtimeServicesMock.summaries = [{
       issueId: "issue-in_review-1",
+      executionWorkspaceId: "workspace-1",
       serviceName: "Preview",
+      serviceIndex: 0,
+      status: "running",
       url: "https://mini.example.ts.net:5173",
     }];
     const { container } = renderBoard({ issues: createIssues(2, "in_review") });
@@ -317,6 +320,32 @@ describe("KanbanBoard", () => {
 
     // Only the card with a running preview gets one.
     expect(container.querySelectorAll('a[href^="https://mini.example.ts.net"]')).toHaveLength(1);
+  });
+
+  it("links a card with a stopped preview to the launcher page, which starts it, in a new tab", async () => {
+    const stopped = (issueId: string, status: IssueRuntimeServiceSummary["status"]): IssueRuntimeServiceSummary => ({
+      issueId, executionWorkspaceId: `workspace-${issueId}`, serviceName: "Preview", serviceIndex: 1, status, url: null,
+    });
+    runtimeServicesMock.summaries = [
+      stopped("issue-in_progress-1", "stopped"),
+      stopped("issue-in_progress-2", "failed"),
+      // A done task's preview is stopped by the terminal sweep: no button.
+      stopped("issue-done-1", "stopped"),
+    ];
+    const { container } = renderBoard({
+      issues: [...createIssues(2, "in_progress"), ...createIssues(1, "done")],
+    });
+    await vi.waitFor(() => expect(container.querySelectorAll('a[href^="/execution-workspaces/"]')).toHaveLength(2));
+
+    const link = container.querySelector<HTMLAnchorElement>('a[href^="/execution-workspaces/workspace-issue-in_progress-1/"]')!;
+    expect(link.getAttribute("href"))
+      .toBe("/execution-workspaces/workspace-issue-in_progress-1/preview?issue=issue-in_progress-1&service=1");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("aria-label")).toBe("Start Preview (opens in a new tab)");
+    expect(link.parentElement?.closest("a")).toBeNull();
+    expect(container.querySelector('a[href^="/execution-workspaces/workspace-issue-in_progress-2/"]')?.getAttribute("aria-label"))
+      .toBe("Preview failed: start it again in a new tab");
+    expect(container.querySelector('a[href^="/execution-workspaces/workspace-issue-done-1/"]')).toBeNull();
   });
 
   describe("tag swimlanes", () => {

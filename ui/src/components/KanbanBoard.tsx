@@ -32,6 +32,7 @@ import { AlertTriangle, ChevronDown, ChevronRight, MonitorPlay } from "lucide-re
 import { isSuccessfulRunHandoffRequired } from "../lib/successful-run-handoff";
 import { collectSubtreeLiveCounts } from "../lib/liveIssueIds";
 import { cn } from "../lib/utils";
+import { previewLauncherPath } from "../lib/preview-launcher";
 import { IN_REVIEW_STATUS_LABEL } from "../lib/issue-status-label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -360,22 +361,47 @@ function PullRequestCardLink({ pullRequest }: { pullRequest: IssuePullRequestSum
   );
 }
 
-/** Opens the task's running preview (or other service with a URL) in a new tab. */
+/**
+ * Opens the task's preview in a new tab. A running preview opens directly; otherwise the tab opens
+ * the launcher page, which starts it and then moves on to it.
+ */
 function RuntimeServiceCardLink({ service }: { service: IssueRuntimeServiceSummary }) {
-  const label = `Open ${service.serviceName} in a new tab`;
+  const icon = <MonitorPlay className="size-3.5 shrink-0" aria-hidden="true" />;
+  if (service.status === "running" && service.url) {
+    const label = `Open ${service.serviceName} in a new tab`;
+    return (
+      <a
+        href={service.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={label}
+        aria-label={label}
+        onPointerDown={stopCardInteraction}
+        onClick={stopCardInteraction}
+        className={cn(CARD_LINK_BUTTON_CLASS, "border-foreground/30 text-foreground")}
+      >
+        {icon}
+      </a>
+    );
+  }
+  const label = service.status === "starting"
+    ? `${service.serviceName} is starting: open it in a new tab when it's ready`
+    : service.status === "failed"
+      ? `${service.serviceName} failed: start it again in a new tab`
+      : `Start ${service.serviceName} (opens in a new tab)`;
   return (
-    <a
-      href={service.url}
+    <Link
+      to={previewLauncherPath(service)}
       target="_blank"
-      rel="noopener noreferrer"
+      rel="noopener"
       title={label}
       aria-label={label}
       onPointerDown={stopCardInteraction}
       onClick={stopCardInteraction}
       className={CARD_LINK_BUTTON_CLASS}
     >
-      <MonitorPlay className="size-3.5 shrink-0" aria-hidden="true" />
-    </a>
+      {icon}
+    </Link>
   );
 }
 
@@ -415,6 +441,9 @@ function KanbanCard({
     transform: CSS.Transform.toString(transform),
     transition,
   };
+
+  // A done or cancelled task's preview is stopped by the terminal sweep: nothing to open.
+  const previewService = issue.status === "done" || issue.status === "cancelled" ? undefined : runtimeService;
 
   const agentName = (id: string | null) => {
     if (!id || !agents) return null;
@@ -482,7 +511,7 @@ function KanbanCard({
         {/* Room for the link buttons, which sit outside the task link. */}
         <div className={cn(
           "flex items-center gap-2 min-w-0",
-          pullRequest && runtimeService ? "pr-24" : pullRequest ? "pr-16" : runtimeService ? "pr-8" : null,
+          pullRequest && previewService ? "pr-24" : pullRequest ? "pr-16" : previewService ? "pr-8" : null,
         )}>
           {/* PAP-411: priority UI hidden behind SHOW_TASK_PRIORITY_UI. */}
           {SHOW_TASK_PRIORITY_UI && <PriorityIcon priority={issue.priority} />}
@@ -498,9 +527,9 @@ function KanbanCard({
           })()}
         </div>
       </Link>
-      {pullRequest || runtimeService ? (
+      {pullRequest || previewService ? (
         <div className={cn("absolute flex items-stretch gap-1", compact ? "bottom-2 right-2" : "bottom-2.5 right-2.5")}>
-          {runtimeService ? <RuntimeServiceCardLink service={runtimeService} /> : null}
+          {previewService ? <RuntimeServiceCardLink service={previewService} /> : null}
           {pullRequest ? <PullRequestCardLink pullRequest={pullRequest} /> : null}
         </div>
       ) : null}
@@ -567,8 +596,8 @@ export function KanbanBoard({
     () => new Map((pullRequestSummaries ?? []).map((summary) => [summary.issueId, summary])),
     [pullRequestSummaries],
   );
-  // Workspace activity refreshes this at once; services that agents start, or that stop when idle,
-  // send no event, so it also refreshes every minute while the board is open.
+  // Each task's preview, running or not. Workspace activity refreshes this at once; services that
+  // agents start, or that stop when idle, send no event, so it also refreshes every minute.
   const { data: runtimeServiceSummaries } = useQuery({
     queryKey: queryKeys.issues.runtimeServices(companyId ?? "", sortedIssueIds),
     queryFn: ({ signal }) => issuesApi.runtimeServices(companyId!, sortedIssueIds, { signal }),

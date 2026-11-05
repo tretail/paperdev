@@ -196,7 +196,7 @@ Review: `baseline`.
 API: `present` — representative operation IDs:
 
 - `POST /api/execution-workspaces/{id}/runtime-services/{action}`.
-- `GET /api/companies/{companyId}/issues/runtime-services?ids=` (read-only board card links).
+- `GET /api/companies/{companyId}/issues/runtime-services?ids=` (read-only board card preview buttons: each task's browser service, running or not).
 
 Agent access: `available` — Authorized agent REST / native `call_api` / CLI runtime
 service controls and existing stdio MCP controls. The board link read is REST only;
@@ -204,7 +204,8 @@ task-bridge keys are refused.
 
 Policy: Company/project/workspace visibility and runtime authority; active run, trust
 preset and task ownership where required. The board link read returns only tasks the
-actor can read, in isolated workspaces the actor can read. A finished task tree's own
+actor can read, in isolated workspaces the actor can read. The board's launcher page
+starts a stopped preview through the same `runtime-services/start` route and its checks. A finished task tree's own
 services are stopped by the system sweep (`execution_workspace.runtime_stop`,
 `reason: issue_terminal`), not by an agent action.
 

@@ -429,6 +429,7 @@ export type {
   WorkspaceRuntimeControlTarget,
   WorkspaceRuntimeService,
   IssueRuntimeServiceSummary,
+  IssueRuntimeServiceSummaryStatus,
   WorkspaceRuntimeServiceStateMap,
   WorkspaceRuntimeDesiredState,
   WorkspaceRealizationRecord,

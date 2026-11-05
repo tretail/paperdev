@@ -86,6 +86,7 @@ const StatusCards = lazy(() => import("./pages/StatusCards").then((module) => ({
 const RoutineDetail = lazy(() => import("./pages/RoutineDetail").then((module) => ({ default: module.RoutineDetail })));
 const UserProfile = lazy(() => import("./pages/UserProfile").then((module) => ({ default: module.UserProfile })));
 const ExecutionWorkspaceDetail = lazy(() => import("./pages/ExecutionWorkspaceDetail").then((module) => ({ default: module.ExecutionWorkspaceDetail })));
+const ExecutionWorkspacePreview = lazy(() => import("./pages/ExecutionWorkspacePreview").then((module) => ({ default: module.ExecutionWorkspacePreview })));
 const Goals = lazy(() => import("./pages/Goals").then((module) => ({ default: module.Goals })));
 const Artifacts = lazy(() => import("./pages/Artifacts").then((module) => ({ default: module.Artifacts })));
 const GoalDetail = lazy(() => import("./pages/GoalDetail").then((module) => ({ default: module.GoalDetail })));
@@ -364,6 +365,7 @@ function boardRoutes(streamlinedUiEnabled: boolean, combinedInboxTasksEnabled: b
           <Route path="execution-workspaces/:workspaceId/runtime-logs" element={<ExecutionWorkspaceDetail />} />
           <Route path="execution-workspaces/:workspaceId/issues" element={<ExecutionWorkspaceDetail />} />
           <Route path="execution-workspaces/:workspaceId/routines" element={<ExecutionWorkspaceDetail />} />
+          <Route path="execution-workspaces/:workspaceId/preview" element={<ExecutionWorkspacePreview />} />
         </Route>
       </Route>
       <Route path="goals" element={<Goals />} />

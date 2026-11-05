@@ -332,11 +332,22 @@ export interface WorkspaceRuntimeService {
   updatedAt: Date;
 }
 
-/** A running service with a URL in a task's own workspace, such as a preview, as a board card shows it. */
+/** Where a task's preview stands, as a board card shows it: running, on its way, stopped or failed. */
+export type IssueRuntimeServiceSummaryStatus = "running" | "starting" | "stopped" | "failed";
+
+/**
+ * The service a person opens in a browser (such as a preview) in a task's own workspace, as a board
+ * card shows it. Reported whether it runs or not, so the card can open it or start it.
+ */
 export interface IssueRuntimeServiceSummary {
   issueId: string;
+  executionWorkspaceId: string;
   serviceName: string;
-  url: string;
+  /** The service's index in the workspace's runtime config, as the start route takes it. */
+  serviceIndex: number;
+  status: IssueRuntimeServiceSummaryStatus;
+  /** Only while it runs. */
+  url: string | null;
 }
 
 export type WorkspaceRealizationMode = "copy" | "in_place";

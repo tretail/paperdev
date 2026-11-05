@@ -8417,8 +8417,8 @@ export function issueRoutes(
     res.json(summaries);
   });
 
-  // The running preview (or other service with a URL) in each task's own workspace, for board
-  // cards. Only tasks the actor can read, in workspaces the actor can read.
+  // The preview (the service a person opens in a browser) in each task's own workspace, running or
+  // not, for board cards. Only tasks the actor can read, in workspaces the actor can read.
   router.get("/companies/:companyId/issues/runtime-services", async (req, res) => {
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);
@@ -8437,7 +8437,7 @@ export function issueRoutes(
       db, companyId, parsed.data.ids, await issueReadSqlCondition(db, req.actor), ISSUE_RUNTIME_SERVICE_SUMMARIES_MAX_IDS,
     );
     const visible = await filterIssuesForActor(req, rows);
-    const summaries: IssueRuntimeServiceSummary[] = await executionWorkspacesSvc.runningServiceLinksForIssues(
+    const summaries: IssueRuntimeServiceSummary[] = await executionWorkspacesSvc.previewServicesForIssues(
       companyId, visible.map((row) => row.id), await executionWorkspaceReadSqlCondition(db, req.actor),
     );
     res.setHeader("Cache-Control", "private, no-store");

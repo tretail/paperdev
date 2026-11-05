@@ -984,6 +984,7 @@ export type {
   WorkspaceRuntimeControlTarget,
   WorkspaceRuntimeService,
   IssueRuntimeServiceSummary,
+  IssueRuntimeServiceSummaryStatus,
   WorkspaceRuntimeServiceStateMap,
   WorkspaceOperation,
   WorkspaceOperationPhase,

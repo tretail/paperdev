@@ -80,7 +80,13 @@ import type {
   IssueRecoveryAction,
   IssueRuntimeServiceSummary,
 } from "@paperclipai/shared";
-import { deriveProjectUrlKey, WORKSPACE_OVERVIEW_LINKED_ISSUE_LIMIT } from "@paperclipai/shared";
+import {
+  deriveProjectUrlKey,
+  listWorkspaceServiceCommandDefinitions,
+  matchWorkspaceRuntimeServiceToCommand,
+  readRuntimeExposureIntent,
+  WORKSPACE_OVERVIEW_LINKED_ISSUE_LIMIT,
+} from "@paperclipai/shared";
 import { conflict, notFound, unprocessable } from "../errors.js";
 import { logger } from "../middleware/logger.js";
 import {
@@ -1265,6 +1271,19 @@ function noActiveRuntimeServicesForWorkspaceCondition(row: ExecutionWorkspaceRow
         ne(workspaceRuntimeServices.status, "stopped"),
       );
   return sql`not exists (select 1 from ${workspaceRuntimeServices} where ${activeServiceConditions})`;
+}
+
+/** A service a person opens in a browser: its config publishes a URL or asks for HTTPS exposure. */
+function runtimeServiceOpensInBrowser(rawConfig: Record<string, unknown>) {
+  const expose = parseObject(rawConfig.expose);
+  if (readRuntimeExposureIntent(expose) === "enabled") return true;
+  return typeof expose.urlTemplate === "string" && expose.urlTemplate.trim().length > 0;
+}
+
+function previewSummaryStatus(status: string | undefined): IssueRuntimeServiceSummary["status"] {
+  if (status === "running" || status === "failed") return status;
+  if (status === "provisioning" || status === "starting") return "starting";
+  return "stopped";
 }
 
 async function loadEffectiveRuntimeServicesByExecutionWorkspace(
@@ -2701,7 +2720,7 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
     /** For board cards: the first running service with a URL in each task's own isolated workspace,
      * such as its preview. A shared workspace runs in the project's checkout, so its services belong
      * to the project, not the task, and are left out. Callers pass only issue IDs the actor may read. */
-    runningServiceLinksForIssues: async (
+    previewServicesForIssues: async (
       companyId: string,
       issueIds: readonly string[],
       readCondition?: SQL<boolean>,
@@ -2720,18 +2739,51 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
           eq(executionWorkspaces.companyId, companyId),
           inArray(executionWorkspaces.id, workspaceIds),
           eq(executionWorkspaces.mode, "isolated_workspace"),
+          notInArray(executionWorkspaces.status, ["archived", "cleanup_failed"]),
           readCondition,
         ));
-      const servicesByWorkspace = await loadEffectiveRuntimeServicesByExecutionWorkspace(db, companyId, rows);
-      const linkByWorkspace = new Map<string, { serviceName: string; url: string }>();
+      if (rows.length === 0) return [];
+      const projectWorkspaceIds = [...new Set(rows.flatMap((row) => row.projectWorkspaceId ? [row.projectWorkspaceId] : []))];
+      const [servicesByWorkspace, projectWorkspaceRows] = await Promise.all([
+        listCurrentRuntimeServicesForExecutionWorkspaces(db, companyId, rows.map((row) => row.id)),
+        projectWorkspaceIds.length > 0
+          ? db
+              .select({ id: projectWorkspaces.id, metadata: projectWorkspaces.metadata })
+              .from(projectWorkspaces)
+              .where(and(eq(projectWorkspaces.companyId, companyId), inArray(projectWorkspaces.id, projectWorkspaceIds)))
+          : Promise.resolve([]),
+      ]);
+      const projectRuntimeById = new Map(projectWorkspaceRows.map((row) => [
+        row.id,
+        readProjectWorkspaceRuntimeConfig((row.metadata as Record<string, unknown> | null) ?? null)?.workspaceRuntime ?? null,
+      ]));
+      const summaryByWorkspace = new Map<string, Omit<IssueRuntimeServiceSummary, "issueId">>();
       for (const row of rows) {
-        const service = (servicesByWorkspace.get(row.id) ?? []).find((candidate) =>
-          candidate.executionWorkspaceId === row.id && candidate.status === "running" && Boolean(candidate.url));
-        if (service?.url) linkByWorkspace.set(row.id, { serviceName: service.serviceName, url: service.url });
+        // The config the start route runs: the workspace's own, else its project workspace's.
+        const workspaceRuntime =
+          readExecutionWorkspaceConfig((row.metadata as Record<string, unknown> | null) ?? null)?.workspaceRuntime
+          ?? (row.projectWorkspaceId ? projectRuntimeById.get(row.projectWorkspaceId) ?? null : null);
+        const command = listWorkspaceServiceCommandDefinitions(workspaceRuntime)
+          .find((candidate) => runtimeServiceOpensInBrowser(candidate.rawConfig));
+        if (!command || command.serviceIndex === null) continue;
+        const current = matchWorkspaceRuntimeServiceToCommand(
+          command,
+          (servicesByWorkspace.get(row.id) ?? [])
+            .filter((service) => service.executionWorkspaceId === row.id)
+            .map((service) => ({ ...service, configIndex: null })),
+        );
+        const status = previewSummaryStatus(current?.status);
+        summaryByWorkspace.set(row.id, {
+          executionWorkspaceId: row.id,
+          serviceName: command.name,
+          serviceIndex: command.serviceIndex,
+          status,
+          url: status === "running" ? current?.url ?? null : null,
+        });
       }
       return linked.flatMap((row) => {
-        const link = row.executionWorkspaceId ? linkByWorkspace.get(row.executionWorkspaceId) : undefined;
-        return link ? [{ issueId: row.issueId, ...link }] : [];
+        const summary = row.executionWorkspaceId ? summaryByWorkspace.get(row.executionWorkspaceId) : undefined;
+        return summary ? [{ issueId: row.issueId, ...summary }] : [];
       });
     },
     listOverview: async (
