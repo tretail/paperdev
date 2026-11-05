@@ -487,9 +487,11 @@ repository: Paperclip runs them outside the agents' sandbox.
 - **Previews:** a project workspace's runtime service with `port: auto` runs
   `preview-sandbox.sh <dev command>`, which puts the dev server in a macOS
   sandbox like the agents': its own company folder only, no secrets, writes
-  only in the worktree, no internet. An app that needs more than one process
-  gets its own wrapper, such as `tablebear-preview.sh` (Spring backend and Vite
-  app, with the app starting once the backend answers). A wrapper must not
+  only in the worktree, no internet. An app that needs more than one step
+  gets its own wrapper: `tablebear-preview.sh` (Spring backend and Vite app,
+  with the app starting once the backend answers) and `particups-preview.sh`
+  (an offline `pnpm install` from the agents' store when the worktree has no
+  `node_modules`, then `pnpm dev`). A wrapper must not
   `exec` into another program. When Paperclip restarts, it adopts a running
   preview only if the process it started still shows the service's command.
   Otherwise it starts a second copy and leaves the first one running.
@@ -515,9 +517,11 @@ repository: Paperclip runs them outside the agents' sandbox.
   address (not on localhost), so the app never starts. Turn the blocker off for
   `<Mac>.<tailnet>.ts.net` on each device you use. A built UI bundles these
   files and isn't affected.
-- **Board cards:** a card shows a preview button while its task's own preview
-  runs, and the preview stops when the task (with its sub-tasks) is done or
-  cancelled. The worktree is still archived later, after the cooldown and the
+- **Board cards:** every card whose task has its own worktree with a preview
+  shows a preview button next to its pull request. A running preview opens
+  directly in a new tab. Otherwise the new tab starts it, shows its start log,
+  then opens it. The preview stops when the task (with its sub-tasks) is done
+  or cancelled, and those cards show no button. The worktree is still archived later, after the cooldown and the
   merged PR. A preview you start by hand doesn't stop on its idle timeout,
   which only counts from the end of an agent run.
 
