@@ -3738,3 +3738,21 @@ in `_test` for `PAPERCLIP_MCP_SLEEP_TEST_DATABASE_URL`,
 `PAPERCLIP_DOT_RUNNER_TEST_DATABASE_URL`. The interaction-service regression suite
 also accepts `PAPERCLIP_INTERACTIONS_TEST_DATABASE_URL`. The suites migrate and write to those
 URLs; the sleep suite truncates company data between tests.
+
+### Personal-fork Claude / Codex switch
+
+For an isolated Paperclip Runner agent configured with the Claude harness and a
+Claude subscription AI connection, configure its **Codex fallback model** and an
+explicit OpenAI API-key connection on the Runtime page, then enable **Follow
+company Claude / Codex switch**. Legacy Claude agents must first use the existing
+Runner upgrade flow. Preconfigured homes and connection-router primary bindings
+are not supported by this switch.
+
+In company Settings, **Use Codex API** selects paid Codex usage for opted-in
+agents; turn it off to return to Claude. The choice is captured during run
+preparation and retained through recovery. Already prepared runs keep their
+provider. Resume quota-paused tasks explicitly after switching. API keys remain
+in the existing connection secret storage. Existing budget controls still apply.
+Provider changes start fresh sessions with existing task/workspace context;
+provider-private conversation state is not transferred. No automatic fallback or
+reset-time switching is performed.

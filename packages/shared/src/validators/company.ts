@@ -35,6 +35,7 @@ export const updateCompanySchema = objectWithoutDefaults(
     .partial()
     .extend({
       status: z.enum(COMPANY_STATUSES).optional(),
+      executionMode: z.enum(["claude", "codex"]).optional(),
       spentMonthlyCents: z.number().int().nonnegative().optional(),
       requireBoardApprovalForNewAgents: z.boolean().optional(),
       interactionResolverGovernance: interactionResolverGovernanceSchema.optional(),

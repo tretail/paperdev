@@ -111,6 +111,7 @@ export function companyService(db: Db, _budgetHooks: BudgetServiceHooks = {}) {
     id: companies.id,
     name: companies.name,
     description: companies.description,
+    executionMode: companies.executionMode,
     status: companies.status,
     issuePrefix: companies.issuePrefix,
     issueCounter: companies.issueCounter,

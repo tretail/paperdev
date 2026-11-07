@@ -77,6 +77,10 @@ export function CompanySettings() {
     }
   });
 
+  const executionModeMutation = useMutation({
+    mutationFn: (executionMode: "claude" | "codex") => companiesApi.update(selectedCompanyId!, { executionMode }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.companies.all }); },
+  });
   const settingsMutation = useMutation({
     mutationFn: (requireApproval: boolean) =>
       companiesApi.update(selectedCompanyId!, {
@@ -339,6 +343,12 @@ export function CompanySettings() {
         </div>
       )}
 
+      <div className="max-w-2xl space-y-4">
+        <ToggleField label="Use Codex API" hint="Switch opted-in agents to paid OpenAI API usage for future runs. Running work finishes with its current provider. Turn off to use Claude subscription. Resume paused tasks explicitly."
+          checked={selectedCompany.executionMode === "codex"}
+          onChange={(v) => executionModeMutation.mutate(v ? "codex" : "claude")} />
+        {executionModeMutation.isError && <p role="alert" className="text-sm text-destructive">{executionModeMutation.error.message}</p>}
+      </div>
       {/* Hiring */}
       <div className="max-w-2xl space-y-4" data-testid="company-settings-team-section">
         <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">

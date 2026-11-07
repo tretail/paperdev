@@ -1,0 +1,1 @@
+ALTER TABLE "companies" ADD COLUMN "execution_mode" text DEFAULT 'claude' NOT NULL;

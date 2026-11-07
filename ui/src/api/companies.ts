@@ -102,6 +102,7 @@ export const companiesApi = {
     data: Partial<
       Pick<
         Company,
+        | "executionMode"
         | "name"
         | "description"
         | "status"

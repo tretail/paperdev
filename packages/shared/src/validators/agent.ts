@@ -70,6 +70,11 @@ export const createAgentInstructionsBundleSchema = z.object({
 
 export const agentRuntimeConfigSchema = z.object({
   aiConnection: aiConnectionBindingSchema.optional(),
+  companyExecutionSwitch: z.object({
+    enabled: z.boolean(),
+    codexModel: z.string().trim().min(1),
+    codexConnection: aiConnectionBindingSchema.refine((binding) => binding.mode !== "responsible_user" && binding.mode !== "router" && binding.provider === "openai" && binding.method === "api_key", "Choose an explicit OpenAI API-key connection"),
+  }).strict().optional(),
   debug: z.object({
     providerTrace: z.literal("raw").optional(),
   }).strict().optional(),

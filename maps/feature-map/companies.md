@@ -152,3 +152,9 @@ Verify benign code reaches a gateway caller, malicious instructions are blocked,
 provider failure records regex fallback, and disabling makes no model call.
 Root results with concealed instruction text use `input_redaction_mismatch`
 fallback without model dispatch.
+
+Manual execution mode extends `companies/identity`: company Settings → Use Codex
+API changes future prepared runs for opted-in isolated Runner Claude agents.
+Agent Runtime supplies the Codex model and explicit API-key connection. Verify
+both switch directions and explicit resume of quota-paused tasks; live provider
+acceptance is not yet recorded. Source: `server/src/services/heartbeat/company-execution-switch.ts`.

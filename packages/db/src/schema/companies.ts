@@ -7,6 +7,7 @@ export const companies = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     description: text("description"),
+    executionMode: text("execution_mode").$type<"claude" | "codex">().notNull().default("claude"),
     status: text("status").notNull().default("active"),
     pauseReason: text("pause_reason"),
     pausedAt: timestamp("paused_at", { withTimezone: true }),

@@ -1450,3 +1450,8 @@ It uses disposable embedded PostgreSQL by default. A disposable local database
 named `review_wait_benchmark...` can be supplied through
 `PAPERCLIP_TEST_DATABASE_URL` to compare another PostgreSQL major version.
 DataRow bytes exclude response metadata and transport overhead.
+
+Migration 0417 adds `companies.execution_mode`, defaulting to `claude`. The board
+API restricts it to `claude` or `codex`. Agent opt-in and Codex fallback settings
+use existing runtime configuration JSON; per-run selections use existing context
+snapshots and contain connection references, never API-key values.

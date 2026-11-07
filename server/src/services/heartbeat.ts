@@ -1,3 +1,4 @@
+import { resolveCompanyExecutionSwitch } from "./heartbeat/company-execution-switch.js";
 import { externalConversationSettlementWork } from "./external-conversation-settlement-work.js";
 import { nativeRecoveryNoticeWork } from "./native-runtime/native-recovery-notice-work.js";
 import { nativeRunProjectionWork } from "./native-runtime/native-run-projection-work.js";
@@ -2478,6 +2479,12 @@ export function heartbeatService(
             taskKey,
           )
         : null;
+      const companySwitch = await resolveCompanyExecutionSwitch(db, agent, run, taskSession, context);
+      if (companySwitch) {
+        config = companySwitch.config;
+        agent = { ...agent, adapterConfig: config, runtimeConfig: { ...agent.runtimeConfig, aiConnection: companySwitch.binding } };
+        if (issueAssigneeOverrides) issueAssigneeOverrides = { ...issueAssigneeOverrides, adapterConfig: { ...issueAssigneeOverrides.adapterConfig, provider: config.provider, acpxAgent: config.acpxAgent, model: config.model } };
+      }
       const savedRouterInput = parseObject(parseObject(run.runnerProfileJson).nativeExecutionInput);
       const routerHasPersistedInput = Object.keys(savedRouterInput).length > 0;
       if (agent.adapterType === "paperclip_runner") {

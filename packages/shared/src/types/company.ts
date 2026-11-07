@@ -18,6 +18,7 @@ export interface Company {
   id: string;
   name: string;
   description: string | null;
+  executionMode?: "claude" | "codex";
   status: CompanyStatus;
   pauseReason: PauseReason | null;
   pausedAt: Date | null;

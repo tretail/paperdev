@@ -1874,6 +1874,20 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
               if (runnerAcpxAgent === "copilot" && hashKey([modelAiBinding ?? null]) === hashKey([binding ?? null])) void refreshConnectionModels();
             }} />}
 
+          {!isCreate && adapterType === "paperclip_runner" && runnerAcpxAgent === "claude" && selectedCompanyId && (() => {
+            const currentRuntime = (overlay.runtime.runtimeConfig as Record<string, unknown> | undefined) ?? runtimeConfig;
+            const fallback = (currentRuntime.companyExecutionSwitch ?? {}) as Record<string, unknown>;
+            const update = (patch: Record<string, unknown>) => mark("runtime", "runtimeConfig", { ...currentRuntime, companyExecutionSwitch: { ...fallback, ...patch } });
+            return <>
+              <ToggleField label="Follow company Claude / Codex switch" hint="Uses this agent’s Claude settings normally and the Codex settings below when the company selects paid Codex API usage. Configure both fields before enabling."
+                checked={fallback.enabled === true} onChange={(enabled) => update({ enabled })} />
+              <Field label="Codex fallback model"><input className={inputClass} value={String(fallback.codexModel ?? "")} onChange={(e) => update({ codexModel: e.target.value })} /></Field>
+              <AiConnectionField companyId={selectedCompanyId} agentId={props.agent.id} agentName={props.agent.name} adapterType="codex_local"
+                value={aiConnectionBindingSchema.safeParse(fallback.codexConnection).data} model={String(fallback.codexModel ?? "")}
+                onChange={(codexConnection) => update({ codexConnection })} />
+            </>;
+          })()}
+
           {showInlineAdapterTestEnvironmentFeedback && !props.compactTestFeedback && (testActionError || testEnvironment.error) && (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               {testActionError

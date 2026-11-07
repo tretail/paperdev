@@ -2906,6 +2906,13 @@
       "when": 1793398771629,
       "tag": "0416_modern_gideon",
       "breakpoints": true
+    },
+    {
+      "idx": 417,
+      "version": "7",
+      "when": 1793875687737,
+      "tag": "0417_faithful_sharon_carter",
+      "breakpoints": true
     }
   ]
 }

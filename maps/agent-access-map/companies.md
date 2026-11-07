@@ -252,3 +252,9 @@ Verification: `not-run` — Reject agent management and foreign-company requests
 verdicts at admitted result boundaries and the original regex on dependency failure.
 
 Gaps: No agent-facing mechanism to request a board configuration change is added.
+
+For `companies/identity`, `PATCH /api/companies/{companyId}` accepts
+`executionMode` (`claude` or `codex`) only in the board settings schema; agent
+branding updates cannot set it. Execution uses current company-scoped connection
+authority. Agent runtime configuration carries opt-in fallback references; the
+company switch does not change task assignees or execution permissions.
