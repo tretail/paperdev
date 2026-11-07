@@ -26,7 +26,8 @@ any plan edit invalidates the approval.
    against the default branch. Record it as a `pull_request` work product on
    the task. Never push to or merge the default branch. Push with
    `git push origin HEAD`: the sandbox blocks the upstream setting that
-   `git push -u` writes to the shared `.git/config`.
+   `git push -u` writes to the shared `.git/config`. Never force-push: see
+   "Updating a pushed branch".
 6. Write an `implementation-report` issue document with:
    - summary of changes and the approved plan revision you followed
    - deviations from the plan and why
@@ -61,6 +62,29 @@ When woken because the code review is done:
    with the verdict, the fixes you made and any **Must read** spots copied from
    the review: `gh pr view --json body`, then `gh pr edit --body-file`.
 6. Set the task `in_review` for human review. Do not mark it `done`.
+
+## Updating a pushed branch
+
+Never rewrite a branch once it's pushed. That means no rebase, no
+`commit --amend` and no `reset` of pushed commits, and no force-push in any
+form (`--force`, `--force-with-lease`, a `+` refspec). Nothing on GitHub stops
+a force-push to the default branch, so Claude Code refuses every force-push,
+and asking the human for one only blocks the task.
+
+When the branch must catch up with the default branch, because of a conflict
+or because the human asks (even if they say "rebase"):
+
+1. `git fetch origin`.
+2. If your local branch has diverged from the pushed one, for example after an
+   earlier rebase, start again from the pushed branch:
+   `git reset --hard origin/<task branch>`.
+3. `git merge origin/<default branch>`. Resolve the conflicts. Regenerate
+   generated files that clash, such as a database migration and its number,
+   rather than editing them by hand.
+4. Run the tests again, then push with `git push origin HEAD`.
+5. Say in your comment that you merged rather than rebased. Add this line to
+   the pull request description: "Contains a merge from <default branch>: use
+   Squash and merge." GitHub's "Rebase and merge" can fail on such a branch.
 
 ## Long commands
 
